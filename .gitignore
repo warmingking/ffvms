@@ -1,0 +1,6 @@
+# ide
+.vscode
+
+# compile and link
+*.o
+ffvms
