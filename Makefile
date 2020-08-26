@@ -1,13 +1,24 @@
-LIB = -levent_core -lglog -lgflags
+src = $(wildcard *.cpp)
+obj = $(src:.cpp=.o)
+dep = $(obj:.o=.d)
 
-objects = ffvms.o rtsp_server.o
+CFLAGS = -MMD
+LDFLAGS = -Lhttp-parser -lhttp_parser -levent_core -lglog -lgflags -lstdc++
 
-ffvms : $(objects)
-	c++ -o ffvms $(objects) $(LIB)
+ffvms: $(obj) libhttp_parser
+	$(CC) -o $@ $(obj) $(LDFLAGS)
 
-ffvms.o : rtsp_server.h
-rtsp_server.o : rtsp_server.h
+-include $(dep)
 
-.PHONY : clean
-clean :
-	rm -rf ffvms $(objects)
+.PHONY: clean cleandep libhttp_parser
+# .FORCE: http_parser
+
+clean:
+	rm -rf ffvms $(obj)
+	$(MAKE) -C http-parser clean
+
+cleandep:
+	rm -rf $(dep)
+
+libhttp_parser:
+	$(MAKE) -C http-parser package
