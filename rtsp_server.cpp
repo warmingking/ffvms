@@ -1,8 +1,8 @@
-#include <netinet/in.h>
 #include <sys/socket.h>
 #include <fcntl.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cstdlib>
+#include <cstring>
+#include <sstream>
 
 #include <event2/listener.h>
 #include <event2/buffer.h>
@@ -12,52 +12,48 @@
 #include "rtsp_server.h"
 
 #define MAX_LINE 16384
+#define NEWLINE "\r\n"
+
+const std::string RTSPOK("RTSP/1.0 200 OK");
+const std::string AllowedCommandNames("OPTIONS, DESCRIBE, SETUP, TEARDOWN, PLAY");
+
+std::mutex RTSPServer::videoMetaMutex;
+std::map<std::string, VideoMeta> RTSPServer::videoMetaMap;
+std::map<std::string, std::list<struct bufferevent*>> RTSPServer::waitingMetaMap;
 
 void readcb(struct bufferevent *bev, void *ctx)
 {
     int rtn;
     RTSPServer* rtspServer = (RTSPServer*) ctx;
-    struct evbuffer *input, *output;
-    char *line;
-    size_t n;
-    int i;
-    input = bufferevent_get_input(bev);
-    output = bufferevent_get_output(bev);
+    struct evbuffer *input = bufferevent_get_input(bev);
+    char line[MAX_LINE];
     bool foundCommandName = false;
 
-    while ((line = evbuffer_readln(input, &n, EVBUFFER_EOL_ANY))) {
-        LOG(INFO) << "receive msg: " << line;
-        if (!foundCommandName) {
-            RTSPCommand command = RTSPCommand::UNKNOWN;
-            rtn = rtspServer->parseCommandLine(line, command);
-            if (rtn < 0) {
-                // todo
-            }
-            switch (command) {
-            case RTSPCommand::OPTIONS:
-                rtspServer->handleCmdOptions(output);
-                break;
-            default:
-                break;
-            }
-        }
-
-        evbuffer_add(output, line, n);
-        evbuffer_add(output, "\n", 1);
-        free(line);
+    int read = evbuffer_remove(input, &line, MAX_LINE);
+    if (read == -1) {
+        LOG(ERROR) << "bufferevent can't drain the buffer";
+        return;
     }
-
-    if (evbuffer_get_length(input) >= MAX_LINE) {
-        /* Too long; just process what there is and go on so that the buffer
-         * doesn't grow infinitely long. */
-        char buf[1024];
-        while (evbuffer_get_length(input)) {
-            int n = evbuffer_remove(input, buf, sizeof(buf));
-            for (i = 0; i < n; ++i)
-                fprintf(stdout, "%c", line[i]);
-            evbuffer_add(output, buf, n);
-        }
-        evbuffer_add(output, "\n", 1);
+    // if (strlen(line) > read) {
+    //     line[read] = '\0'; // don't know why, but sometime they are not equal
+    // }
+    std::pair<RTSPCommand, BaseCommand> parsedCommand;
+    size_t nparsed = RTSPParser::execteParse(line, read, parsedCommand);
+    switch (parsedCommand.first) {
+        case RTSPCommand::OPTIONS:
+            rtspServer->processOptionCommand(bev, parsedCommand.second);
+            break;
+        case RTSPCommand::DESCRIBE:
+            rtspServer->processDescribeCommand(bev, parsedCommand.second);
+            break;
+        case RTSPCommand::SETUP:
+            rtspServer->processSetupCommand(bev, parsedCommand.second);
+            break;
+        case RTSPCommand::PLAY:
+            rtspServer->processPlayCommand(bev, parsedCommand.second);
+            break;
+        default:
+            LOG(ERROR) << "unknown rtsp command " << parsedCommand.first;
     }
 }
 
@@ -73,20 +69,26 @@ void errorcb(struct bufferevent *bev, short error, void *ctx)
         /* must be a timeout event handle, handle it */
         /* ... */
     }
-    struct sockaddr_in* sin = (struct sockaddr_in*) ctx;
-    LOG(INFO) << "connection from " << inet_ntoa(sin->sin_addr) << ":" << htons(sin->sin_port) << " closed";
+    RTSPServer* server = (RTSPServer*) ctx;
+    if (server->mBev2ConnectionMap.count(bev) == 0) {
+        LOG(ERROR) << "unexcept, don't find connection info";
+    } else {
+        struct sockaddr_in sin = server->mBev2ConnectionMap[bev].sin;
+        server->mBev2ConnectionMap.erase(bev);
+        LOG(INFO) << "connection from " << inet_ntoa(sin.sin_addr) << ":" << htons(sin.sin_port) << " closed";
+    }
     bufferevent_free(bev);
 }
 
-void accept_error_cb(struct evconnlistener *listener, void *ctx)
-{
-    struct event_base *base = evconnlistener_get_base(listener);
-    int err = EVUTIL_SOCKET_ERROR();
-    LOG(INFO) << "Shutting down because of got an error on the listener:\n\t"
-              << err << ":" << evutil_socket_error_to_string(err);
+// void accept_error_cb(struct evconnlistener *listener, void *ctx)
+// {
+//     struct event_base *base = evconnlistener_get_base(listener);
+//     int err = EVUTIL_SOCKET_ERROR();
+//     LOG(INFO) << "Shutting down because of got an error on the listener:\n\t"
+//               << err << ":" << evutil_socket_error_to_string(err);
 
-    event_base_loopexit(base, NULL);
-}
+//     event_base_loopexit(base, NULL);
+// }
 
 void accept_conn_cb(struct evconnlistener *listener, 
                    evutil_socket_t sock,
@@ -99,12 +101,41 @@ void accept_conn_cb(struct evconnlistener *listener,
     struct event_base *base = evconnlistener_get_base(listener);
     struct bufferevent *bev = bufferevent_socket_new(base, sock, BEV_OPT_CLOSE_ON_FREE);
 
-    bufferevent_setcb(bev, readcb, NULL, errorcb, (void*) ptr);
+    RTSPServer* server = (RTSPServer*) ptr;
+    server->mBev2ConnectionMap[bev] = RTSPConnection{*sin, 0};
+    bufferevent_setcb(bev, readcb, NULL, errorcb, ptr);
 
     bufferevent_enable(bev, EV_READ|EV_WRITE);
 }
 
-RTSPServer::RTSPServer(int p): mPort(p) {};
+void RTSPServer::addVideoSourceCallback(const VideoMeta& meta, const void* client) {
+    VLOG(1) << "video meta: " << meta.toString();
+    std::string* url = (std::string*) meta.data;
+    RTSPServer* server = (RTSPServer*) client;
+    std::scoped_lock _(videoMetaMutex);
+    videoMetaMap[*url] = meta;
+    auto it = waitingMetaMap.find(*url);
+    if (it != waitingMetaMap.end()) {
+        for (const auto& output : waitingMetaMap[*url]) {
+            server->sendDescribeSdp(output, meta);
+        }
+        waitingMetaMap.erase(it);
+    } else {
+        LOG(ERROR) << "no client waiting for video " << *url;
+    }
+}
+
+RTSPServer::RTSPServer(int p): mPort(p) {
+    mpProbeVideoThreadPool = new ctpl::thread_pool(std::thread::hardware_concurrency());
+    mpVideoManagerService = new VideoManagerService();
+};
+
+RTSPServer::~RTSPServer() {
+    if (mpVideoManagerService)
+        delete mpProbeVideoThreadPool;
+    if (mpVideoManagerService)
+        delete mpVideoManagerService;
+}
 
 void RTSPServer::start() {
     struct sockaddr_in sin;
@@ -133,25 +164,111 @@ void RTSPServer::start() {
     event_base_dispatch(base);
 }
 
-int RTSPServer::parseCommandLine(const char* const line, RTSPCommand& command) {
-    for (int i = 0; i != strlen(line); ++i) {
-        if (line[i] == ' ') continue;
-        if ((i + COMMAND_LENGTH) > strlen(line)) return -1;
-        if (line[i] == 'O'
-            && line[i+1] == 'P'
-            && line[i+2] == 'T'
-            && line[i+3] == 'I'
-            && line[i+4] == 'O'
-            && line[i+5] == 'N'
-            && line[i+6] == 'S') {
-            command = RTSPCommand::OPTIONS;
-            return 0;
-        }
-        return 1;
+void RTSPServer::processOptionCommand(struct bufferevent* bev, const BaseCommand& baseCommand) {
+    VLOG(1) << "receive cmmond OPTIONS: " << baseCommand.toString();
+    if (mBev2ConnectionMap.count(bev) == 0) {
+        LOG(ERROR) << "unexcept error, unknown bufferevent";
+        return;
+    }
+    mBev2ConnectionMap[bev].currentCseq = baseCommand.cseq;
+    std::ostringstream response(RTSPOK, std::ostringstream::ate);
+    response << NEWLINE
+             << "CSeq: " << baseCommand.cseq
+             << NEWLINE
+             << "Public: " << AllowedCommandNames
+             << NEWLINE
+             << NEWLINE;
+    response.seekp(0, std::ostringstream::end);
+    auto len = response.tellp();
+    evbuffer_add(bufferevent_get_output(bev), response.str().c_str(), len);
+}
+
+void RTSPServer::processDescribeCommand(struct bufferevent* bev, const BaseCommand& baseCommand) {
+    VLOG(1) << "receive cmmond DESCRIBE: " << baseCommand.toString();
+    if (mBev2ConnectionMap.count(bev) == 0) {
+        LOG(ERROR) << "unexcept error, unknown bufferevent";
+        return;
+    }
+    mBev2ConnectionMap[bev].currentCseq = baseCommand.cseq;
+    std::scoped_lock _(videoMetaMutex);
+    if (videoMetaMap.count(baseCommand.url) > 0) {
+        sendDescribeSdp(bev, videoMetaMap[baseCommand.url]);
+    } else if (waitingMetaMap.count(baseCommand.url) > 0) {
+        waitingMetaMap[baseCommand.url].push_back(bev);
+    } else {
+        waitingMetaMap[baseCommand.url] = std::list<struct bufferevent*>{bev};
+        const std::string& url = baseCommand.url;
+        mpProbeVideoThreadPool->push([this, url] (int id) {
+            mpVideoManagerService->addVideoSource(url, RTSPServer::addVideoSourceCallback, this);
+        });
     }
 }
 
-void RTSPServer::handleCmdOptions(struct evbuffer* output)
-{
-    LOG(INFO) << "receive cmmond OPTIONS";
+void RTSPServer::sendDescribeSdp(struct bufferevent* bev, const VideoMeta& meta) {
+    if (mBev2ConnectionMap.count(bev) == 0) {
+        LOG(ERROR) << "unexcept error, unknown bufferevent";
+        return;
+    }
+
+    std::ostringstream sdp("", std::ostringstream::ate);
+    std::string payload;
+    switch (meta.codec) {
+        case CodecType::H264:
+            payload = "H264"; break;
+        case CodecType::HEVC:
+            payload = "H265"; break;
+        default:
+            LOG(ERROR) << "video codec not supported, video meta: " << meta.toString();
+            return;
+    }
+    sdp << "m=video 0 RTP/AVP 98"
+        << NEWLINE
+        << "a=rtpmap:98 " << payload << "/9000";
+    // TODO: what about other parameters, such as duration
+    sdp.seekp(0, std::ostringstream::end);
+    auto len = sdp.tellp();
+
+    std::ostringstream response(RTSPOK, std::ostringstream::ate);
+    response << NEWLINE
+             << "CSeq: " << mBev2ConnectionMap[bev].currentCseq
+             << NEWLINE
+             << "Content-Type: application/sdp"
+             << NEWLINE
+             << "Content-Length: " << len
+             << NEWLINE
+             << NEWLINE
+             << sdp.str();
+    response.seekp(0, std::ostringstream::end);
+    len = response.tellp();
+    evbuffer_add(bufferevent_get_output(bev), response.str().c_str(), len);
+}
+
+void RTSPServer::processSetupCommand(struct bufferevent* bev, const BaseCommand& baseCommand) {
+    VLOG(1) << "receive cmmond SETUP: " << baseCommand.toString();
+    if (mBev2ConnectionMap.count(bev) == 0) {
+        LOG(ERROR) << "unexcept error, unknown bufferevent";
+        return;
+    }
+    mBev2ConnectionMap[bev].currentCseq = baseCommand.cseq;
+    std::ostringstream response(RTSPOK, std::ostringstream::ate);
+    response << NEWLINE
+             << "CSeq: " << baseCommand.cseq
+             << NEWLINE
+             << "Transport: RTP/AVP/TCP;interleaved=0-1"
+             << NEWLINE
+             << "Session: 12345678"
+             << NEWLINE
+             << NEWLINE;
+    response.seekp(0, std::ostringstream::end);
+    auto len = response.tellp();
+    LOG(INFO) << "zapeng: len: " << len << "\n" << response.str();
+    evbuffer_add(bufferevent_get_output(bev), response.str().c_str(), len);
+}
+
+void RTSPServer::processPlayCommand(struct bufferevent* bev, const BaseCommand& baseCommand) {
+    VLOG(1) << "receive cmmond PLAY: " << baseCommand.toString();
+    uint8_t* data = new uint8_t[1024];
+    size_t size;
+    mpVideoManagerService->getFrame(baseCommand.url, data, size);
+    LOG(INFO) << "data: " << data;
 }

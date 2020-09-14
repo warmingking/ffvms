@@ -3,10 +3,12 @@ obj = $(src:.cpp=.o)
 dep = $(obj:.o=.d)
 
 CFLAGS = -MMD
-LDFLAGS = -Lhttp-parser -lhttp_parser -levent_core -lglog -lgflags -lstdc++
+LDFLAGS_AV = -lavutil -lavformat -lavcodec
+LDFLAGS = -Lhttp-parser -lhttp_parser -levent_core -lglog -lgflags -lpthread -lstdc++
+CXXFLAGS= -std=c++17
 
 ffvms: $(obj) libhttp_parser
-	$(CC) -o $@ $(obj) $(LDFLAGS)
+	$(CC) -o $@ $(obj) $(LDFLAGS_AV) $(LDFLAGS)
 
 -include $(dep)
 
