@@ -1,9 +1,11 @@
+#include <memory>
 #include <cstring>
-#include <map>
 #include <algorithm>
 #include <cctype>
 #include <glog/logging.h>
 #include "rtsp_parser.h"
+
+const std::string STREAMID_PATTEN = "/streamid=";
 
 std::string BaseCommand::toString() const {
     return "cseq: " + std::to_string(cseq)
@@ -61,14 +63,19 @@ int RTSPParser::url_cb(http_parser* p, const char* buf, size_t len) {
     struct http_parser_url u;
     http_parser_url_init(&u);
     http_parser_parse_url(buf, len, 0, &u);
-    std::string url(buf, len);
-    size_t streamid = 0;
-    if (sscanf(parsedCommand->second.url.c_str(), "streamid=%lu", &streamid) == 1) {
-        parsedCommand->second.streamid = streamid;
-        auto at = url.find(streamid);
+    if ((u.field_set >> 3) <= 0) {
+        LOG(ERROR) << "invailed url: " << buf;
+        return -1;
+    }
+    const size_t offset = u.field_data[3].off; // alise
+    std::string url(&buf[offset], len - offset);
+    size_t streamid(0);
+    const size_t at = url.find(STREAMID_PATTEN);
+    if (at != std::string::npos) {
+        streamid = std::stoi(url.substr(at + STREAMID_PATTEN.size()));
         url = url.substr(0, at);
     }
-    parsedCommand->second.url = std::string(buf, len);
+    parsedCommand->second.url = url;
     return 0;
 }
 
@@ -125,7 +132,7 @@ http_parser_settings RTSPParser::settings = {
 };
 
 size_t RTSPParser::execteParse(const char *data, size_t len, std::pair<RTSPCommand, BaseCommand>& parsedcommand) {
-    RTSPCommand command = RTSPCommand::UNKNOWN;
+    parsedcommand.first = RTSPCommand::UNKNOWN;
     VLOG(1) << "http_parser_execute: \n" << data;
     http_parser* parser = new http_parser;
     http_parser_init(parser, HTTP_BOTH);

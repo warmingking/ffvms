@@ -1,10 +1,10 @@
 #ifndef RTSP_PARSER_H
 #define RTSP_PARSER_H
 
-#include <memory>
 #include <map>
-#include <mutex>
+#include <utility>
 #include "http-parser/http_parser.h"
+#include "common.h"
 
 enum RTSPCommand {
     UNKNOWN = 0,
@@ -19,11 +19,6 @@ enum RTSPCommand {
     GET_PARAMETER,
     SET_PARAMETER,
     REDIRECT
-};
-
-enum StreamingMode {
-    TCP,
-    UDP
 };
 
 struct BaseCommand {

@@ -4,7 +4,7 @@ dep = $(obj:.o=.d)
 
 CFLAGS = -MMD
 LDFLAGS_AV = -lavutil -lavformat -lavcodec
-LDFLAGS = -Lhttp-parser -lhttp_parser -levent_core -lglog -lgflags -lpthread -lstdc++
+LDFLAGS = -Lhttp-parser -lhttp_parser -levent_core -levent_pthreads -lglog -lgflags -lpthread -lstdc++
 CXXFLAGS= -std=c++17
 
 ffvms: $(obj) libhttp_parser
