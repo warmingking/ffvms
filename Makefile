@@ -7,6 +7,9 @@ LDFLAGS_AV = -lavutil -lavformat -lavcodec
 LDFLAGS = -Lhttp-parser -lhttp_parser -levent_core -levent_pthreads -lglog -lgflags -lpthread -lstdc++
 CXXFLAGS= -std=c++17
 
+debug: CXXFLAGS += -DDEBUG -g
+debug: ffvms
+
 ffvms: $(obj) libhttp_parser
 	$(CC) -o $@ $(obj) $(LDFLAGS_AV) $(LDFLAGS)
 

@@ -2,6 +2,7 @@
 #define VIDEO_MANAGER_SERVICE_H
 
 #include <map>
+#include <unordered_map>
 #include <list>
 #include <mutex>
 #include <string>
@@ -10,54 +11,11 @@ extern "C" {
 }
 #include "common.h"
 
-struct VideoSourceParams {
-    bool _use_file;
-    std::string filename;
-    bool repeatedly;
-    bool _use_gb;
-    std::string gbid;
-    StreamingMode gbStreamingMode;
-
-    inline void reset() {
-        _use_file = false;
-        _use_gb = false;
-    }
-
-    inline bool valueEqual(const VideoSourceParams& other) const {
-        return (_use_file == other._use_file)
-               && (filename == other.filename)
-               && (_use_gb == other._use_gb)
-               && (gbid == other.gbid);
-    }
-
-    // inline bool valueAndParamsEqual(const VideoSourceParams& other) const {
-    //     return (_use_file == other._use_file)
-    //            && (filename == other.filename)
-    //            && (repeatedly == other.repeatedly)
-    //            && (_use_gb == other._use_gb)
-    //            && (gbid == other.gbid)
-    //            && (gbStreamingMode == other.gbStreamingMode);
-    // }
+class VideoSink {
+public:
+    virtual void writeRtpData(const VideoRequest& url, uint8_t* data, size_t len) = 0;
+    virtual ~VideoSink();
 };
-
-// enum CodecType {
-//     H264,
-//     HEVC
-// };
-
-// struct VideoMeta {
-//     std::pair<uint32_t, uint32_t> fps;
-//     CodecType codec;
-//     double duration;
-//     void* data; // custom data
-
-//     std::string toString() const {
-//         return "fps: " + std::to_string(fps.first)
-//                 + "/" + std::to_string(fps.second)
-//                 + ",\tcodec: " + std::to_string(codec)
-//                 + ",\tduration: " + std::to_string(duration);
-//     }
-// };
 
 struct VideoContext {
     std::mutex mutex;
@@ -71,13 +29,15 @@ struct VideoContext {
     // AVStream* oVideoStream;
     AVPacket* pkt;
     unsigned char* buf;
+    int64_t pts; // 只有在输入流pts为AV_NOPTS_VALUE时才有效
 
     VideoContext(bool repeatedly, int videoStreamId, std::pair<uint32_t, uint32_t> fps, AVFormatContext* iFmtCtx, AVFormatContext* oFmtCtx)
         : repeatedly(repeatedly)
           , videoStreamId(videoStreamId)
           , fps(fps)
           , iFmtCtx(iFmtCtx)
-          , oFmtCtx(oFmtCtx) {
+          , oFmtCtx(oFmtCtx)
+          , pts(0) {
         pkt = new AVPacket;
         av_init_packet(pkt);
         pkt->data = NULL;
@@ -88,29 +48,32 @@ struct VideoContext {
     // TODO: deconstruct
 };
 
-typedef void (*AddVideoSourceCallback) (const std::pair<const std::string*, const std::string*>& url2sdp, const void* client);
+typedef void (*AddVideoSourceCallback) (const std::pair<const VideoRequest*, std::string*>& url2sdp);
 
 class VideoManagerService {
 public:
+    // VideoManagerService();
+
+    VideoManagerService(VideoSink* sink);
+
     void InitializeRpc(const std::string& rpcFromHost, const uint16_t& rpcFromPort);
 
-    void addVideoSource(const std::string* url, AddVideoSourceCallback callback, const void* client);
+    void addAndProbeVideoSourceAsync(const VideoRequest url, AddVideoSourceCallback callback);
 
-    int getVideoFps(const std::string& url, std::pair<uint32_t, uint32_t>& fps);
+    int getVideoFps(const VideoRequest& url, std::pair<uint32_t, uint32_t>& fps);
 
-    int getFrame(const std::string& url);
+    int getFrame(const VideoRequest& url);
 
 private:
     void finishingWork(const std::string& url); // 取流结束后的处理
-    bool parseAndCheckUrl(const std::string& url, VideoSourceParams& params);
+    // bool parseAndCheckUrl(const VideoRequest& url, VideoSourceParams& params);
     std::mutex mParseUrlMutex;
-    std::map<std::string, VideoSourceParams> mUrl2VideoSourceParamsMap;
+    // std::map<std::string, VideoSourceParams> mUrl2VideoSourceParamsMap;
     std::mutex mVideoContextMutex;
-    std::map<std::string, VideoContext*> mUrl2VideoContextMap;
-
+    std::unordered_map<VideoRequest, VideoContext*> mUrl2VideoContextMap;
 
 private:
-    static std::map<void*, std::string> opaque2urlMap;
+    static VideoSink* videoSink; // TODO: 1. rtspserver 继承 videosink 2. vms 改为单例
     static int writeCb (void* opaque, uint8_t* buf, int bufsize);
 };
 

@@ -2,28 +2,15 @@
 #define RTSP_PARSER_H
 
 #include <map>
+#include <memory>
 #include <utility>
 #include "http-parser/http_parser.h"
 #include "common.h"
 
-enum RTSPCommand {
-    UNKNOWN = 0,
-    OPTIONS,
-    DESCRIBE,
-    SETUP,
-    PLAY,
-    PAUSE,
-    RECORD,
-    ANNOUNCE,
-    TEAEWORN,
-    GET_PARAMETER,
-    SET_PARAMETER,
-    REDIRECT
-};
-
 struct BaseCommand {
     size_t cseq;
     std::string url;
+    VideoRequest videoRequest;
     std::string session;
     size_t streamid;
     StreamingMode streamingMode;

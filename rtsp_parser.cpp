@@ -72,10 +72,11 @@ int RTSPParser::url_cb(http_parser* p, const char* buf, size_t len) {
     size_t streamid(0);
     const size_t at = url.find(STREAMID_PATTEN);
     if (at != std::string::npos) {
-        streamid = std::stoi(url.substr(at + STREAMID_PATTEN.size()));
+        parsedCommand->second.streamid = std::stoi(url.substr(at + STREAMID_PATTEN.size()));
         url = url.substr(0, at);
     }
     parsedCommand->second.url = url;
+    parsedCommand->second.videoRequest = VideoRequest::parseUrl(url);
     return 0;
 }
 
@@ -140,4 +141,5 @@ size_t RTSPParser::execteParse(const char *data, size_t len, std::pair<RTSPComma
     size_t nparsed = http_parser_execute(parser, &settings, data, len);
 
     delete parser; // don't worry, will not free parsedcommand
+    return 0; // TODO: 忘记返回值什么含义了
 };
