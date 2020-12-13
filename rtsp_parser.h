@@ -18,6 +18,7 @@ struct BaseCommand {
     std::string lastHeader;
 
     std::string toString() const;
+    friend std::ostream& operator<<(std::ostream& os, const BaseCommand& command);
 };
 
 class RTSPParser {

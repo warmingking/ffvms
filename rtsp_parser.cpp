@@ -15,6 +15,10 @@ std::string BaseCommand::toString() const {
            + ",\tport: " + std::to_string(rtpPort);
 }
 
+std::ostream& operator<<(std::ostream& os, const BaseCommand& command) {
+    return os << command.toString();
+};
+
 int RTSPParser::message_begin_cb(http_parser* p) {
     VLOG(1) << "messge begin cb";
     return 0;

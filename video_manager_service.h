@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <list>
 #include <mutex>
+#include <shared_mutex>
 #include <string>
 extern "C" {
     #include <libavformat/avformat.h>
@@ -30,6 +31,18 @@ struct VideoContext {
     AVPacket* pkt;
     unsigned char* buf;
     int64_t pts; // 只有在输入流pts为AV_NOPTS_VALUE时才有效
+
+    VideoContext(bool repeatedly)
+        : repeatedly(repeatedly)
+          , iFmtCtx(NULL)
+          , oFmtCtx(NULL)
+          , pts(0) {
+        pkt = new AVPacket;
+        av_init_packet(pkt);
+        pkt->data = NULL;
+        pkt->size = 0;
+        buf = (unsigned char*) av_malloc(bufSize);
+    }
 
     VideoContext(bool repeatedly, int videoStreamId, std::pair<uint32_t, uint32_t> fps, AVFormatContext* iFmtCtx, AVFormatContext* oFmtCtx)
         : repeatedly(repeatedly)
@@ -64,13 +77,15 @@ public:
 
     int getFrame(const VideoRequest& url);
 
+    int teardown(const VideoRequest& url);
+
 private:
     void finishingWork(const std::string& url); // 取流结束后的处理
     // bool parseAndCheckUrl(const VideoRequest& url, VideoSourceParams& params);
-    std::mutex mParseUrlMutex;
+    std::mutex mAddVideoMutex;
     // std::map<std::string, VideoSourceParams> mUrl2VideoSourceParamsMap;
-    std::mutex mVideoContextMutex;
-    std::unordered_map<VideoRequest, VideoContext*> mUrl2VideoContextMap;
+    std::shared_mutex mVideoContextMapMutex;
+    std::map<VideoRequest, VideoContext*> mUrl2VideoContextMap;
 
 private:
     static VideoSink* videoSink; // TODO: 1. rtspserver 继承 videosink 2. vms 改为单例

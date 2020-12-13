@@ -12,6 +12,19 @@ enum StreamingMode {
 };
 
 struct VideoRequest {
+private:
+    inline std::string cmpStr() const {
+        std::string requestStr("");
+        if (_use_file) {
+            requestStr = "file://" + filename;
+        } else if (_use_gb) {
+            requestStr = "gb://" + gbid;
+        }
+        return requestStr;
+    }
+    std::string toString() const;
+
+public:
     bool _use_file;
     std::string filename;
     bool repeatedly;
@@ -26,17 +39,9 @@ struct VideoRequest {
 
     friend std::ostream& operator<<(std::ostream& os, const VideoRequest& request);
 
-    inline bool operator==(const VideoRequest& other) const {
-        bool f = (_use_file == other._use_file)
-               && (filename == other.filename)
-               && (_use_gb == other._use_gb)
-               && (gbid == other.gbid);
-        if (!f) {
-            LOG(INFO) << _use_file << "-" << other._use_file;
-            LOG(INFO) << filename << "-" << other.filename;
-            LOG(INFO) << _use_gb << "-" << other._use_gb;
-        }
-        return f;
+    bool operator<(const VideoRequest& other) const
+    {
+        return this->cmpStr() < other.cmpStr();
     }
 
     inline bool valueAndParamsEqual(const VideoRequest& other) const {
@@ -47,9 +52,6 @@ struct VideoRequest {
                && (gbid == other.gbid)
                && (gbStreamingMode == other.gbStreamingMode);
     }
-
-private:
-    std::string toString() const;
 };
 
 namespace std

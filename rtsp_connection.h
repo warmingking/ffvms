@@ -6,7 +6,6 @@
 
 class RTSPConnection {
 public:
-    struct sockaddr_in sin;
     size_t currentCseq;
 };
 

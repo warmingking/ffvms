@@ -28,10 +28,22 @@ struct RTSPRequest {
 
 class RTSPServer : public VideoSink {
 public:
+    class VideoObject {
+    public:
+        std::mutex mMutex;
+        std::string sdp;
+        bool sdpReady;
+        std::map<struct bufferevent*, RTSPConnection> mBev2ConnectionMap;
+        uint8_t rtpHeader[4];
+        struct event* pPlayingEvent;
+
+        VideoObject();
+        // virtual ~VideoObject();
+    };
+
+public:
     static RTSPServer& getInstance();
-
     virtual ~RTSPServer();
-
     void start(int port);
 
 private:
@@ -50,7 +62,6 @@ public:
     void processDescribeCommand(struct bufferevent* bev, const BaseCommand&);
     void processSetupCommand(struct bufferevent* bev, const BaseCommand&);
     void processPlayCommand(struct bufferevent* bev, const BaseCommand&);
-    void sendDescribeSdp(struct bufferevent* bev, const std::string& sdp);
 
     void writeRtpData(const VideoRequest& url, uint8_t* data, size_t len);
 
@@ -59,12 +70,11 @@ public:
 private:
     std::atomic<unsigned int> mSessionId;
     std::string getSessionId();
-    std::map<struct bufferevent*, RTSPConnection> mBev2ConnectionMap;
-    std::mutex mVideoSdpMutex;
-    std::unordered_map<VideoRequest, std::string> mVideoRequest2SdpMap;
-    std::unordered_map<VideoRequest, std::list<bufferevent*>> mWaitingMetaMap; // 用list组织，因为只有顺序访问
-    std::unordered_map<VideoRequest, std::pair<uint8_t*, std::set<bufferevent*>>> mPlayingVideoMap; // value是一个pair，key是buffer，value是bevs，bev用set组织，因为可能有查找删除等操作,
-    std::unordered_map<VideoRequest, struct event*> mUrl2EventMap;
+    void sendDescribeSdp(struct bufferevent* bev, const int currentCseq, const std::string& sdp);
+    void teardown(const VideoRequest& url);
+
+    std::mutex mMutex;
+    std::map<VideoRequest, VideoObject*> mProcessingVideoMap;
 
     friend void accept_conn_cb(struct evconnlistener *listener,
                                evutil_socket_t sock,
