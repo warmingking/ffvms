@@ -83,14 +83,14 @@ void errorcb(struct bufferevent *bev, short error, void *ctx)
     delete[] addressStr;
 
     RTSPServer &server = RTSPServer::getInstance();
+    std::shared_lock _(server.mMutex);
     for (auto &request2video : server.mProcessingVideoMap)
     {
         // alias
         RTSPServer::VideoObject *pVideo = request2video.second;
         if (pVideo->mBev2ConnectionMap.count(bev) != 0)
         {
-            std::scoped_lock videoLock(pVideo->mMutex);
-            std::scoped_lock _(server.mMutex);
+            std::unique_lock videoLock(pVideo->mMutex);
             pVideo->mBev2ConnectionMap.erase(bev);
             if (pVideo->mBev2ConnectionMap.empty())
             {
@@ -102,7 +102,7 @@ void errorcb(struct bufferevent *bev, short error, void *ctx)
                         VideoRequest *pRequest = (VideoRequest *)arg;
                         RTSPServer::VideoObject *pVideo = server.mProcessingVideoMap[*pRequest];
                         // 再次判断是否为空, 如果为空, 停掉这一路
-                        std::scoped_lock _(server.mMutex); // 加锁，防止正在停的时候来了新的请求
+                        std::unique_lock _(server.mMutex); // 加锁，防止正在停的时候来了新的请求
                         if (pVideo->mBev2ConnectionMap.empty())
                         {
                             server.teardown(*pRequest);
@@ -146,10 +146,6 @@ void writeFrameInEventLoop(evutil_socket_t fd, short what, void *arg)
 
 
 const auto t = std::chrono::system_clock::now();
-        // server.mpVideoManagerService->getFrame(*pVideoRequest);
-        // LOG_EVERY_N(INFO, 100000) << "send one frame for " << *pVideoRequest << " spend "
-        //                        << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now() - t).count()
-        //                        << " microseconds";
     server.mpGetFrameThreadPool->push([&server, pVideoRequest](int id) {
         const auto t = std::chrono::system_clock::now();
         server.mpVideoManagerService->getFrame(*pVideoRequest);
@@ -178,7 +174,6 @@ RTSPServer::RTSPServer() : mpBase(NULL), mSessionId(0)
 {
     mpProbeVideoThreadPool = new ctpl::thread_pool(std::thread::hardware_concurrency());
     mpGetFrameThreadPool = new ctpl::thread_pool(std::thread::hardware_concurrency());
-    // mpGetFrameThreadPool = new ctpl::thread_pool(1);
     mpVideoManagerService = new VideoManagerService(this);
 };
 
@@ -230,7 +225,7 @@ void RTSPServer::processOptionCommand(struct bufferevent *bev, const BaseCommand
     VLOG(1) << "receive command OPTIONS: " << baseCommand;
     RTSPServer::VideoObject *pVideo;
     { // 这里假设client都从OPTION开始
-        std::scoped_lock _(mMutex);
+        std::unique_lock _(mMutex);
         if (mProcessingVideoMap.count(baseCommand.videoRequest) == 0)
         {
             pVideo = new RTSPServer::VideoObject();
@@ -258,7 +253,7 @@ void RTSPServer::processOptionCommand(struct bufferevent *bev, const BaseCommand
 void RTSPServer::processDescribeCommand(struct bufferevent *bev, const BaseCommand &baseCommand)
 {
     VLOG(1) << "receive command DESCRIBE: " << baseCommand;
-    std::scoped_lock _(mMutex);
+    std::shared_lock _(mMutex);
     if (mProcessingVideoMap.count(baseCommand.videoRequest) == 0)
     {
         LOG(ERROR) << "unexcept error, request " << baseCommand.videoRequest << " not recorded";
@@ -280,7 +275,7 @@ void RTSPServer::processDescribeCommand(struct bufferevent *bev, const BaseComma
                 VLOG(1) << "request " << *url << " get sdp:\n"
                         << *sdp;
                 RTSPServer &server = RTSPServer::getInstance();
-                std::scoped_lock _(server.mMutex);
+                std::shared_lock _(server.mMutex);
                 if (server.mProcessingVideoMap.count(*url) == 0)
                 {
                     LOG(WARNING) << "no recorded request " << *url << ", maybe disconnected";
@@ -326,7 +321,7 @@ std::string RTSPServer::getSessionId()
 void RTSPServer::processSetupCommand(struct bufferevent *bev, const BaseCommand &baseCommand)
 {
     VLOG(1) << "receive command SETUP: " << baseCommand;
-    std::scoped_lock _(mMutex);
+    std::shared_lock _(mMutex);
     if (mProcessingVideoMap.count(baseCommand.videoRequest) == 0)
     {
         LOG(ERROR) << "unexcept error, request " << baseCommand.videoRequest << " not recorded";
@@ -360,7 +355,7 @@ void RTSPServer::processSetupCommand(struct bufferevent *bev, const BaseCommand 
 void RTSPServer::processPlayCommand(struct bufferevent *bev, const BaseCommand &baseCommand)
 {
     VLOG(1) << "receive command PLAY: " << baseCommand;
-    std::scoped_lock _(mMutex);
+    std::shared_lock _(mMutex);
     auto it = mProcessingVideoMap.find(baseCommand.videoRequest);
     if (it == mProcessingVideoMap.end())
     {
@@ -398,7 +393,8 @@ void RTSPServer::processPlayCommand(struct bufferevent *bev, const BaseCommand &
     evbuffer_add(bufferevent_get_output(bev), response.str().c_str(), len);
 }
 
-void RTSPServer::teardown(const VideoRequest& request) {
+void RTSPServer::teardown(const VideoRequest& request) { 
+    // 无需加锁, 调用者已经加锁了
     LOG(INFO) << "to stop request " << request;
     VideoObject* pVideo = mProcessingVideoMap[request];
     if (pVideo->pPlayingEvent != NULL) {
@@ -414,13 +410,14 @@ void RTSPServer::teardown(const VideoRequest& request) {
 
 void RTSPServer::writeRtpData(const VideoRequest &url, uint8_t *data, size_t len)
 {
+    std::shared_lock _(mMutex);
     if (mProcessingVideoMap.count(url) == 0)
     {
         LOG(ERROR) << "unexcept error, request " << url << " not recorded";
         return; // TODO: return 400
     }
     RTSPServer::VideoObject *pVideo = mProcessingVideoMap[url];
-    std::scoped_lock videoLock(pVideo->mMutex);
+    std::shared_lock videoLock(pVideo->mMutex);
 
     int payload = data[1] & 0x7f;
     int interleaved(0);

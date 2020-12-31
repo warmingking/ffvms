@@ -58,64 +58,67 @@ void VideoManagerService::addAndProbeVideoSourceAsync(const VideoRequest request
                 break;
             } // 以上可能会阻塞, 放在锁外面
             {
-                // 拿写锁, 保存到 map 里面
-                std::unique_lock _(mVideoContextMapMutex);
-                AVStream *stream = iFmtCtx->streams[streamid];
-                auto fps = std::make_pair<>(stream->avg_frame_rate.num, stream->avg_frame_rate.den);
-                ret = avformat_alloc_output_context2(&oFmtCtx, NULL, "rtp", request.filename.c_str());
-                if (ret < 0)
-                {
-                    LOG(ERROR) << "could not create output context for request " << request;
-                    break;
-                }
+                std::string sdp;
+                { 
+                    // 拿写锁, 保存到 map 里面
+                    std::unique_lock _(mVideoContextMapMutex);
+                    AVStream *stream = iFmtCtx->streams[streamid];
+                    auto fps = std::make_pair<>(stream->avg_frame_rate.num, stream->avg_frame_rate.den);
+                    ret = avformat_alloc_output_context2(&oFmtCtx, NULL, "rtp", request.filename.c_str());
+                    if (ret < 0)
+                    {
+                        LOG(ERROR) << "could not create output context for request " << request;
+                        break;
+                    }
 
-                VideoContext *videoContext = new VideoContext(request.repeatedly, streamid, fps, iFmtCtx, oFmtCtx);
-                auto [it, succ] = mUrl2VideoContextMap.insert(std::make_pair(request, videoContext));
-                if (!succ)
-                {
-                    LOG(ERROR) << "unexcept error, insert video context failed for request " << request;
-                    return;
-                }
+                    VideoContext *videoContext = new VideoContext(request.repeatedly, streamid, fps, iFmtCtx, oFmtCtx);
+                    auto [it, succ] = mUrl2VideoContextMap.insert(std::make_pair(request, videoContext));
+                    if (!succ)
+                    {
+                        LOG(ERROR) << "unexcept error, insert video context failed for request " << request;
+                        return;
+                    }
 
-                AVOutputFormat *oFmt = oFmtCtx->oformat;
-                AVStream *outStream = avformat_new_stream(oFmtCtx, NULL);
-                if (outStream == NULL)
-                {
-                    LOG(ERROR) << "failed allocating output stream for request " << request;
-                    break;
-                }
-                ret = avcodec_parameters_copy(outStream->codecpar, stream->codecpar);
-                if (ret < 0)
-                {
-                    LOG(ERROR) << "failed to copy codec parameters for request " << request;
-                    break;
-                }
-                outStream->codecpar->codec_tag = 0;
-                AVIOContext *oioContext = avio_alloc_context(
-                    videoContext->buf, VideoContext::bufSize,
-                    1,
-                    const_cast<VideoRequest *>(&it->first),
-                    NULL,
-                    VideoManagerService::writeCb,
-                    NULL);
-                oioContext->max_packet_size = MAX_RTP_PKT_SIZE;
-                videoContext->oFmtCtx->pb = oioContext;
-                // av_dump_format(videoContext->oFmtCtx, 0, NULL, 1);
-                char *buf = new char[MAX_SDP_LENGTH];
-                ret = av_sdp_create(&videoContext->oFmtCtx, 1, buf, MAX_SDP_LENGTH);
-                if (ret < 0)
-                {
-                    LOG(ERROR) << "create sdp failed for request " << request;
-                    break;
-                }
-                std::string sdp(buf);
-                delete[] buf; // FIXME: ugly
-                // oFmt->flags &= AVFMT_NOTIMESTAMPS; // 没什么用
-                ret = avformat_write_header(videoContext->oFmtCtx, NULL);
-                if (ret < 0)
-                {
-                    LOG(ERROR) << "error occurred when write header for request " << request.filename;
-                    break;
+                    AVOutputFormat *oFmt = oFmtCtx->oformat;
+                    AVStream *outStream = avformat_new_stream(oFmtCtx, NULL);
+                    if (outStream == NULL)
+                    {
+                        LOG(ERROR) << "failed allocating output stream for request " << request;
+                        break;
+                    }
+                    ret = avcodec_parameters_copy(outStream->codecpar, stream->codecpar);
+                    if (ret < 0)
+                    {
+                        LOG(ERROR) << "failed to copy codec parameters for request " << request;
+                        break;
+                    }
+                    outStream->codecpar->codec_tag = 0;
+                    AVIOContext *oioContext = avio_alloc_context(
+                        videoContext->buf, VideoContext::bufSize,
+                        1,
+                        const_cast<VideoRequest *>(&it->first),
+                        NULL,
+                        VideoManagerService::writeCb,
+                        NULL);
+                    oioContext->max_packet_size = MAX_RTP_PKT_SIZE;
+                    videoContext->oFmtCtx->pb = oioContext;
+                    // av_dump_format(videoContext->oFmtCtx, 0, NULL, 1);
+                    char *buf = new char[MAX_SDP_LENGTH];
+                    ret = av_sdp_create(&videoContext->oFmtCtx, 1, buf, MAX_SDP_LENGTH);
+                    if (ret < 0)
+                    {
+                        LOG(ERROR) << "create sdp failed for request " << request;
+                        break;
+                    }
+                    sdp = std::string(buf);
+                    delete[] buf; // FIXME: ugly
+                    // oFmt->flags &= AVFMT_NOTIMESTAMPS; // 没什么用
+                    ret = avformat_write_header(videoContext->oFmtCtx, NULL);
+                    if (ret < 0)
+                    {
+                        LOG(ERROR) << "error occurred when write header for request " << request.filename;
+                        break;
+                    }
                 }
                 callback(std::make_pair(&request, &sdp)); // 只有在初始化output成功后才调用callback
             }
@@ -169,7 +172,9 @@ int VideoManagerService::getFrame(const VideoRequest &request)
     VideoContext *videoContext = mUrl2VideoContextMap[request];
     if (videoContext->mutex.try_lock())
     {
+        // 用来过滤音频流
         bool getVideoPkt(false);
+        bool locked(true);
         int ret(0);
         do
         {
@@ -259,6 +264,9 @@ int VideoManagerService::getFrame(const VideoRequest &request)
                     videoContext->pkt->pts = videoContext->pkt->dts;
                 }
             }
+            // av_interleaved_write_frame前释放锁, 避免回调里面有锁, 形成死锁
+            videoContext->mutex.unlock();
+            locked = false;
             ret = av_interleaved_write_frame(videoContext->oFmtCtx, videoContext->pkt);
             if (ret < 0)
             {
@@ -268,10 +276,12 @@ int VideoManagerService::getFrame(const VideoRequest &request)
         } while (!getVideoPkt);
         if (ret != 0)
         {
+            if (locked) {
+                videoContext->mutex.unlock();
+            }
             char buf;
             LOG(WARNING) << "get frame failed for request " << request << ", for reason: " << av_make_error_string(&buf, 1024, ret);
         }
-        videoContext->mutex.unlock();
         return 0;
     }
     else

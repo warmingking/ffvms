@@ -32,18 +32,6 @@ struct VideoContext {
     unsigned char* buf;
     int64_t pts; // 只有在输入流pts为AV_NOPTS_VALUE时才有效
 
-    VideoContext(bool repeatedly)
-        : repeatedly(repeatedly)
-          , iFmtCtx(NULL)
-          , oFmtCtx(NULL)
-          , pts(0) {
-        pkt = new AVPacket;
-        av_init_packet(pkt);
-        pkt->data = NULL;
-        pkt->size = 0;
-        buf = (unsigned char*) av_malloc(bufSize);
-    }
-
     VideoContext(bool repeatedly, int videoStreamId, std::pair<uint32_t, uint32_t> fps, AVFormatContext* iFmtCtx, AVFormatContext* oFmtCtx)
         : repeatedly(repeatedly)
           , videoStreamId(videoStreamId)

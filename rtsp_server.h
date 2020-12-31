@@ -3,6 +3,7 @@
 
 #include <list>
 #include <set>
+#include <shared_mutex>
 #include <unordered_map>
 #include <glog/logging.h>
 #include <event2/bufferevent.h>
@@ -30,7 +31,7 @@ class RTSPServer : public VideoSink {
 public:
     class VideoObject {
     public:
-        std::mutex mMutex;
+        std::shared_mutex mMutex;
         std::string sdp;
         bool sdpReady;
         std::map<struct bufferevent*, RTSPConnection> mBev2ConnectionMap;
@@ -73,7 +74,7 @@ private:
     void sendDescribeSdp(struct bufferevent* bev, const int currentCseq, const std::string& sdp);
     void teardown(const VideoRequest& url);
 
-    std::mutex mMutex;
+    std::shared_mutex mMutex;
     std::map<VideoRequest, VideoObject*> mProcessingVideoMap;
 
     friend void accept_conn_cb(struct evconnlistener *listener,
