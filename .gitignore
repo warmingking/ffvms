@@ -1,6 +1,12 @@
 # ide
 .vscode
 
+# code analysis
+compile_commands.json
+*.srctrlbm
+*.srctrldb
+*.srctrlprj
+
 # compile and link
 *.o
 ffvms
