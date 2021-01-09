@@ -39,7 +39,7 @@ VideoRequest VideoRequest::parseUrl(const std::string& url) {
 
 std::string VideoRequest::toString() const {
     if (_use_file) {
-        return "file://" + filename + "?repeatedly=" + (repeatedly ? "true": "");
+        return "file://" + filename + "?repeatedly=" + (repeatedly ? "true": "false");
     } else if (_use_gb) {
         std::string prefix = "gb://" + gbid + "&gbStreamingMode=";
         if (gbStreamingMode == StreamingMode::TCP) {

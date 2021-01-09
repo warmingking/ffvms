@@ -20,6 +20,9 @@ int VideoManagerService::writeCb(void *opaque, uint8_t *buf, int bufsize)
 VideoManagerService::VideoManagerService(VideoSink *sink)
 {
     videoSink = sink;
+    mpAddAndProbeVideoThreadPool = new ctpl::thread_pool(std::thread::hardware_concurrency());
+    mpGetAndSendFrameThreadPool = new ctpl::thread_pool(std::thread::hardware_concurrency());
+    mpTeardownThreadPool = new ctpl::thread_pool(std::thread::hardware_concurrency());
 }
 
 void VideoManagerService::InitializeRpc(const std::string &rpcFromHost, const uint16_t &rpcFromPort)
@@ -27,11 +30,19 @@ void VideoManagerService::InitializeRpc(const std::string &rpcFromHost, const ui
     LOG(INFO) << "TODO: Initialize";
 }
 
-void VideoManagerService::addAndProbeVideoSourceAsync(const VideoRequest request, AddVideoSourceCallback callback)
+void VideoManagerService::addAndProbeVideoSourceAsync(const VideoRequest& request, AddVideoSourceCallback callback)
 {
-    VLOG(1) << "addAndProbeVideoSourceAsync. request: " << request;
+    mpAddAndProbeVideoThreadPool->push([this, request, callback](int id) {
+        addAndProbeVideoSource(request, callback);
+    });
+}
+
+void VideoManagerService::addAndProbeVideoSource(const VideoRequest request, AddVideoSourceCallback callback)
+{
+    VLOG(1) << "addAndProbeVideoSource. request: " << request;
 
     int ret(0);
+    std::string sdp;
     AVFormatContext *iFmtCtx = NULL, *oFmtCtx = NULL;
     do
     {
@@ -58,13 +69,12 @@ void VideoManagerService::addAndProbeVideoSourceAsync(const VideoRequest request
                 break;
             } // 以上可能会阻塞, 放在锁外面
             {
-                std::string sdp;
                 { 
                     // 拿写锁, 保存到 map 里面
                     std::unique_lock _(mVideoContextMapMutex);
                     AVStream *stream = iFmtCtx->streams[streamid];
                     auto fps = std::make_pair<>(stream->avg_frame_rate.num, stream->avg_frame_rate.den);
-                    ret = avformat_alloc_output_context2(&oFmtCtx, NULL, "rtp", request.filename.c_str());
+                    ret = avformat_alloc_output_context2(&oFmtCtx, NULL, "rtp", NULL);
                     if (ret < 0)
                     {
                         LOG(ERROR) << "could not create output context for request " << request;
@@ -78,6 +88,8 @@ void VideoManagerService::addAndProbeVideoSourceAsync(const VideoRequest request
                         LOG(ERROR) << "unexcept error, insert video context failed for request " << request;
                         return;
                     }
+
+                    av_dict_set(&oFmtCtx->metadata, "title", request.filename.c_str(), 0);
 
                     AVOutputFormat *oFmt = oFmtCtx->oformat;
                     AVStream *outStream = avformat_new_stream(oFmtCtx, NULL);
@@ -120,7 +132,7 @@ void VideoManagerService::addAndProbeVideoSourceAsync(const VideoRequest request
                         break;
                     }
                 }
-                callback(std::make_pair(&request, &sdp)); // 只有在初始化output成功后才调用callback
+                callback(request, 0, sdp); // 只有在初始化output成功后才调用callback
             }
         }
         else
@@ -131,6 +143,17 @@ void VideoManagerService::addAndProbeVideoSourceAsync(const VideoRequest request
     } while (false);
     if (ret != 0)
     {
+        char buf[1024];
+        LOG(WARNING) << "probe video failed for " << request << ", for reason: " << av_make_error_string(buf, 1024, ret);
+        if (ret == AVERROR(ENOENT))
+        {
+            callback(request, 404, sdp);
+        }
+        else
+        {
+            callback(request, 500, sdp);
+        }
+        
         if (teardown(request) == -1)
         {
             // TODO: -1 表示还没保存到 map 里面, 只需要手动清理 ctx 即可
@@ -144,6 +167,7 @@ void VideoManagerService::addAndProbeVideoSourceAsync(const VideoRequest request
                 {
                     avio_context_free(&oFmtCtx->pb);
                 }
+                av_dict_free(&oFmtCtx->metadata);
                 avformat_free_context(oFmtCtx);
             }
         }
@@ -161,13 +185,22 @@ int VideoManagerService::getVideoFps(const VideoRequest &request, std::pair<uint
     return 0;
 }
 
-int VideoManagerService::getFrame(const VideoRequest &request)
+void VideoManagerService::getFrameAsync(const VideoRequest &request)
 {
+    mpGetAndSendFrameThreadPool->push([this, request](int id) {
+        getFrame(request);
+    });
+}
+
+void VideoManagerService::getFrame(const VideoRequest request)
+{
+    const auto t = std::chrono::system_clock::now();
     std::shared_lock _(mVideoContextMapMutex);
     if (mUrl2VideoContextMap.count(request) == 0)
     {
         LOG(ERROR) << "no video context for request " << request;
-        return -1;
+        return;
+        // FIXME: this is unexcept, what should do?
     }
     VideoContext *videoContext = mUrl2VideoContextMap[request];
     if (videoContext->mutex.try_lock())
@@ -184,34 +217,41 @@ int VideoManagerService::getFrame(const VideoRequest &request)
                 // 如果是 eof 且需要循环取流, seek 到开始位置, 重新播放
                 if ((ret == AVERROR_EOF) && videoContext->repeatedly)
                 {
-                    LOG(INFO) << "read frame for request " << request << " eof, will repeat read";
-                    bool seekSucc(true);
-                    for (size_t i = 0; i < videoContext->iFmtCtx->nb_streams; ++i)
+                    if (videoContext->repeatedly)
                     {
-                        const auto stream = videoContext->iFmtCtx->streams[i];
-                        ret = avio_seek(videoContext->iFmtCtx->pb, 0, SEEK_SET);
-                        if (ret < 0)
+                        LOG(INFO) << "read frame for request " << request << " eof, will repeat read";
+                        bool seekSucc(true);
+                        for (size_t i = 0; i < videoContext->iFmtCtx->nb_streams; ++i)
                         {
-                            seekSucc = false;
-                            LOG(ERROR) << "error occurred when seeking to start";
+                            const auto stream = videoContext->iFmtCtx->streams[i];
+                            ret = avio_seek(videoContext->iFmtCtx->pb, 0, SEEK_SET);
+                            if (ret < 0)
+                            {
+                                seekSucc = false;
+                                LOG(ERROR) << "error occurred when seeking to start";
+                                break;
+                            }
+                            ret = avformat_seek_file(videoContext->iFmtCtx, i, 0, 0, stream->duration, 0);
+                            if (ret < 0)
+                            {
+                                seekSucc = false;
+                                LOG(ERROR) << "error occurred when seeking to start";
+                                break;
+                            }
+                        }
+                        if (seekSucc)
+                        {
+                            videoContext->oFmtCtx->streams[0]->cur_dts = 0;
+                            LOG(WARNING) << "seek to start for request " << request;
+                            continue;
+                        }
+                        else
+                        {
                             break;
                         }
-                        ret = avformat_seek_file(videoContext->iFmtCtx, i, 0, 0, stream->duration, 0);
-                        if (ret < 0)
-                        {
-                            seekSucc = false;
-                            LOG(ERROR) << "error occurred when seeking to start";
-                            break;
-                        }
-                    }
-                    if (seekSucc)
+                    } else
                     {
-                        videoContext->oFmtCtx->streams[0]->cur_dts = 0;
-                        LOG(WARNING) << "seek to start for request " << request;
-                        continue;
-                    }
-                    else
-                    {
+                        videoContext->finish = true;
                         break;
                     }
                 }
@@ -279,28 +319,58 @@ int VideoManagerService::getFrame(const VideoRequest &request)
             if (locked) {
                 videoContext->mutex.unlock();
             }
-            char buf;
-            LOG(WARNING) << "get frame failed for request " << request << ", for reason: " << av_make_error_string(&buf, 1024, ret);
+            char buf[1024];
+            LOG(WARNING) << "get frame failed for request " << request << ", for reason: " << av_make_error_string(buf, 1024, ret);
+            if (ret != AVERROR(EAGAIN))
+            {
+                std::shared_lock _(mVideoContextMapMutex);
+                if (mUrl2VideoContextMap.count(request) == 0)
+                {
+                    LOG(ERROR) << "no video context for request " << request;
+                    // FIXME: this is unexcept, what should do?
+                    return;
+                }
+                VideoContext *videoContext = mUrl2VideoContextMap[request];
+                std::scoped_lock videoLock(videoContext->mutex);
+                if (videoContext->finish)
+                {
+                    LOG(INFO) << "write trailer for " << request;
+                    int ret = av_write_trailer(videoContext->oFmtCtx);
+                    if (ret < 0)
+                    {
+                        LOG(WARNING) << "write trailer failer for " << request << ", for reason: " << av_make_error_string(buf, 1024, ret);
+                    }
+                }
+                teardownAsync(request);
+                videoSink->streamComplete(request);
+            }
         }
-        return 0;
+        LOG_EVERY_N(INFO, 100000) << "send one frame for " << request << " spend "
+                                  << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now() - t).count()
+                                  << " microseconds";
     }
     else
     {
         LOG(ERROR) << "request " << request << " is locked";
-        return -1;
     }
 }
 
-int VideoManagerService::teardown(const VideoRequest &url)
+void VideoManagerService::teardownAsync(const VideoRequest &request)
 {
-    LOG(INFO) << "teardown " << url;
+    mpTeardownThreadPool->push([this, request](int id) {
+        teardown(request);
+    });
+}
+
+int VideoManagerService::teardown(const VideoRequest request)
+{
     std::unique_lock _(mVideoContextMapMutex);
-    if (mUrl2VideoContextMap.count(url) == 0)
+    if (mUrl2VideoContextMap.count(request) == 0)
     {
-        LOG(WARNING) << "request " << url << " not found, may not be added";
-        return -1; // TODO: error code, -1 表示没找到，需要手动清理
+        LOG(WARNING) << "request " << request << " not found, may not be added";
+        return -1; // -1 表示没找到, 需要手动清理
     }
-    VideoContext *pVideoContext = mUrl2VideoContextMap[url];
+    VideoContext *pVideoContext = mUrl2VideoContextMap[request];
     avformat_close_input(&pVideoContext->iFmtCtx);
     if (pVideoContext->oFmtCtx != NULL)
     {
@@ -314,7 +384,8 @@ int VideoManagerService::teardown(const VideoRequest &url)
     av_packet_free(&pVideoContext->pkt);
     av_free(pVideoContext->buf);
     delete pVideoContext;
-    mUrl2VideoContextMap.erase(url);
+    mUrl2VideoContextMap.erase(request);
+    LOG(INFO) << "teardown " << request << " succ";
     return 0;
 }
 

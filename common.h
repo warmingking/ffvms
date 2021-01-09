@@ -4,6 +4,10 @@
 #include <string>
 #include <glog/logging.h>
 
+#if __INTELLISENSE__
+#pragma diag_suppress 144
+#endif
+
 void funcTrace();
 
 enum StreamingMode {

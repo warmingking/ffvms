@@ -4,10 +4,8 @@
 #include <list>
 #include <set>
 #include <shared_mutex>
-#include <unordered_map>
 #include <glog/logging.h>
 #include <event2/bufferevent.h>
-#include "CTPL/ctpl_stl.h"
 #include "rtsp_parser.h"
 #include "rtsp_connection.h"
 #include "video_manager_service.h"
@@ -53,10 +51,7 @@ private:
     RTSPServer& operator=(const RTSPServer&);
 
     int mPort;
-    struct event_base* mpBase;
     VideoManagerService* mpVideoManagerService;
-    ctpl::thread_pool* mpProbeVideoThreadPool;
-    ctpl::thread_pool* mpGetFrameThreadPool;
 
 public:
     void processOptionCommand(struct bufferevent* bev, const BaseCommand&);
@@ -65,12 +60,17 @@ public:
     void processPlayCommand(struct bufferevent* bev, const BaseCommand&);
 
     void writeRtpData(const VideoRequest& url, uint8_t* data, size_t len);
+    void streamComplete(const VideoRequest& request);
 
     static void sendFrame(const std::set<struct bufferevent*>& bevs, const uint8_t* data, const size_t len);
 
 private:
+    ctpl::thread_pool* mpIOThreadPool;
     std::atomic<unsigned int> mSessionId;
+
+    void startIOLoop(struct sockaddr_in& sin);
     std::string getSessionId();
+    void sendRtspError(struct bufferevent* bev, const int currentCseq, const int error);
     void sendDescribeSdp(struct bufferevent* bev, const int currentCseq, const std::string& sdp);
     void teardown(const VideoRequest& url);
 

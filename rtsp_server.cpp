@@ -20,6 +20,8 @@
 #define NEWLINE "\r\n"
 
 const std::string RTSPOK("RTSP/1.0 200 OK");
+const std::string RTSPNOTFOUND("RTSP/1.0 404 Not Found");
+const std::string RTSPSERVERBUSY("RTSP/1.0 500 Internal Server Busy");
 const std::string AllowedCommandNames("OPTIONS, DESCRIBE, SETUP, TEARDOWN, PLAY");
 
 // 从 RTSP client 接收数据, 并且处理为 RTSPCommand -> BaseCommand
@@ -27,7 +29,6 @@ void readcb(struct bufferevent *bev, void *ctx)
 {
     int rtn;
     RTSPServer &rtspServer = RTSPServer::getInstance();
-    ;
     struct evbuffer *input = bufferevent_get_input(bev);
     char line[MAX_LINE];
     bool foundCommandName = false;
@@ -55,7 +56,7 @@ void readcb(struct bufferevent *bev, void *ctx)
         rtspServer.processPlayCommand(bev, parsedCommand.second);
         break;
     default:
-        LOG(ERROR) << "unknown rtsp command " << parsedCommand.first;
+        VLOG(1) << "unsupport rtsp command " << parsedCommand.first;
     }
 }
 
@@ -96,15 +97,17 @@ void errorcb(struct bufferevent *bev, short error, void *ctx)
             {
                 LOG(INFO) << "add delay event for request " << request2video.first;
                 struct event *event = event_new(
-                    server.mpBase, -1, EV_TIMEOUT, [](evutil_socket_t fd, short what, void *arg) {
+                    bufferevent_get_base(bev), -1, EV_TIMEOUT, [](evutil_socket_t fd, short what, void *arg) {
                         RTSPServer &server = RTSPServer::getInstance();
                         // alias
                         VideoRequest *pRequest = (VideoRequest *)arg;
-                        RTSPServer::VideoObject *pVideo = server.mProcessingVideoMap[*pRequest];
-                        // 再次判断是否为空, 如果为空, 停掉这一路
                         std::unique_lock _(server.mMutex); // 加锁，防止正在停的时候来了新的请求
-                        if (pVideo->mBev2ConnectionMap.empty())
+                        auto it = server.mProcessingVideoMap.find(*pRequest);
+                        if (it != server.mProcessingVideoMap.end()
+                            && it->second->mBev2ConnectionMap.empty())
                         {
+                            // 如果这一路依然存在 
+                            // 且connection为空, 停掉这一路
                             server.teardown(*pRequest);
                         }
                     },
@@ -132,7 +135,7 @@ void accept_conn_cb(struct evconnlistener *listener,
     sprintf(&addressStr[strlen(ip) + 1], "%d", htons(sin->sin_port));
     LOG(INFO) << "connection from " << addressStr;
     struct event_base *base = evconnlistener_get_base(listener);
-    struct bufferevent *bev = bufferevent_socket_new(base, sock, BEV_OPT_CLOSE_ON_FREE | BEV_OPT_THREADSAFE);
+    struct bufferevent *bev = bufferevent_socket_new(base, sock, BEV_OPT_CLOSE_ON_FREE | BEV_OPT_THREADSAFE | BEV_OPT_DEFER_CALLBACKS | BEV_OPT_UNLOCK_CALLBACKS);
 
     bufferevent_set_max_single_write(bev, 1400); // 不大于mtu, 确保数据可以即时发送走
     bufferevent_setcb(bev, readcb, NULL, errorcb, addressStr);
@@ -143,26 +146,13 @@ void writeFrameInEventLoop(evutil_socket_t fd, short what, void *arg)
 {
     VideoRequest *pVideoRequest = (VideoRequest *)arg;
     RTSPServer &server = RTSPServer::getInstance();
-
-
-const auto t = std::chrono::system_clock::now();
-    server.mpGetFrameThreadPool->push([&server, pVideoRequest](int id) {
-        const auto t = std::chrono::system_clock::now();
-        server.mpVideoManagerService->getFrame(*pVideoRequest);
-        LOG_EVERY_N(INFO, 100000) << "send one frame for " << *pVideoRequest << " spend "
-                               << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now() - t).count()
-                               << " microseconds";
-    });
+    server.mpVideoManagerService->getFrameAsync(*pVideoRequest);
 }
 
 RTSPServer::VideoObject::VideoObject() : sdpReady(false), pPlayingEvent(NULL)
 {
 }
 
-void RTSPServer::sendFrame(const std::set<struct bufferevent *> &bevs, const uint8_t *data, const size_t len)
-{
-    LOG(INFO) << "========== sendFrame ============";
-}
 
 RTSPServer &RTSPServer::getInstance()
 {
@@ -170,20 +160,15 @@ RTSPServer &RTSPServer::getInstance()
     return instance;
 }
 
-RTSPServer::RTSPServer() : mpBase(NULL), mSessionId(0)
+RTSPServer::RTSPServer() : mSessionId(0)
 {
-    mpProbeVideoThreadPool = new ctpl::thread_pool(std::thread::hardware_concurrency());
-    mpGetFrameThreadPool = new ctpl::thread_pool(std::thread::hardware_concurrency());
+    mpIOThreadPool = new ctpl::thread_pool(std::thread::hardware_concurrency() - 1);
     mpVideoManagerService = new VideoManagerService(this);
 };
 
 RTSPServer::~RTSPServer()
 {
-    // TODO: add lock
-    if (mpVideoManagerService)
-        delete mpProbeVideoThreadPool;
-    if (mpGetFrameThreadPool)
-        delete mpGetFrameThreadPool;
+    // TODO: to expand
     if (mpVideoManagerService)
         delete mpVideoManagerService;
 }
@@ -191,33 +176,46 @@ RTSPServer::~RTSPServer()
 void RTSPServer::start(int port)
 {
     struct sockaddr_in sin;
-    struct evconnlistener *connlistener;
 
     int ret = evthread_use_pthreads();
     if (ret != 0)
     {
         LOG(FATAL) << "evthread_use_pthreads failed";
     }
-    mpBase = event_base_new();
-    if (!mpBase)
-        LOG(FATAL) << "failed to create event base";
 
     sin.sin_family = AF_INET;
     sin.sin_addr.s_addr = htonl(0);
     sin.sin_port = htons(port);
-    connlistener = evconnlistener_new_bind(mpBase,
-                                           accept_conn_cb,
-                                           NULL,
-                                           LEV_OPT_CLOSE_ON_FREE | LEV_OPT_REUSEABLE,
-                                           -1,
-                                           (struct sockaddr *)&sin,
-                                           sizeof(sin));
+
+    for (int i = 0; i != mpIOThreadPool->size(); ++i)
+    {
+        mpIOThreadPool->push([this, &sin](int id) {
+            startIOLoop(sin);
+        });
+    }
+    startIOLoop(sin);
+}
+
+void RTSPServer::startIOLoop(struct sockaddr_in& sin)
+{
+    struct event_base* base = event_base_new();
+    if (!base)
+    {
+        LOG(FATAL) << "failed to create event base";
+    }
+    struct evconnlistener* connlistener = evconnlistener_new_bind(base,
+                                        accept_conn_cb,
+                                        NULL,
+                                        LEV_OPT_CLOSE_ON_FREE | LEV_OPT_REUSEABLE | LEV_OPT_REUSEABLE_PORT,
+                                        -1,
+                                        (struct sockaddr *)&sin,
+                                        sizeof(sin));
 
     if (!connlistener)
     {
         LOG(FATAL) << "Couldn't create listener";
     }
-    event_base_dispatch(mpBase);
+    event_base_dispatch(base);
 }
 
 void RTSPServer::processOptionCommand(struct bufferevent *bev, const BaseCommand &baseCommand)
@@ -235,6 +233,7 @@ void RTSPServer::processOptionCommand(struct bufferevent *bev, const BaseCommand
         else
         {
             pVideo = mProcessingVideoMap[baseCommand.videoRequest];
+            std::shared_lock videoLock(pVideo->mMutex);
             pVideo->mBev2ConnectionMap[bev].currentCseq = baseCommand.cseq;
         }
     }
@@ -268,29 +267,57 @@ void RTSPServer::processDescribeCommand(struct bufferevent *bev, const BaseComma
     }
     else
     {
-        mpProbeVideoThreadPool->push([this, baseCommand](int id) {
-            mpVideoManagerService->addAndProbeVideoSourceAsync(baseCommand.videoRequest, [](const std::pair<const VideoRequest *, std::string *> &video2sdp) {
-                const VideoRequest *url = video2sdp.first;
-                const std::string *sdp = video2sdp.second;
-                VLOG(1) << "request " << *url << " get sdp:\n"
-                        << *sdp;
-                RTSPServer &server = RTSPServer::getInstance();
-                std::shared_lock _(server.mMutex);
-                if (server.mProcessingVideoMap.count(*url) == 0)
-                {
-                    LOG(WARNING) << "no recorded request " << *url << ", maybe disconnected";
-                    return; // TODO: return 400
-                }
-                RTSPServer::VideoObject *pVideo = server.mProcessingVideoMap[*url];
+        mpVideoManagerService->addAndProbeVideoSourceAsync(baseCommand.videoRequest, [](const VideoRequest& request, const int ret, const std::string& sdp) {
+            VLOG(1) << "request " << request << " get sdp:\n"
+                    << sdp;
+            RTSPServer &server = RTSPServer::getInstance();
+            std::shared_lock _(server.mMutex);
+            if (server.mProcessingVideoMap.count(request) == 0)
+            {
+                LOG(WARNING) << "no recorded request " << request << ", maybe disconnected";
+                return; // TODO: return 400
+            }
+            RTSPServer::VideoObject *pVideo = server.mProcessingVideoMap[request];
+            if (ret == 0)
+            {
                 for (const auto &bev2connection : pVideo->mBev2ConnectionMap)
                 {
-                    server.sendDescribeSdp(bev2connection.first, bev2connection.second.currentCseq, *sdp);
+                    server.sendDescribeSdp(bev2connection.first, bev2connection.second.currentCseq, sdp);
                 }
-                pVideo->sdp = *sdp;
+                pVideo->sdp = sdp;
                 pVideo->sdpReady = true;
-            });
+            }
+            else
+            {
+                for (const auto &bev2connection : pVideo->mBev2ConnectionMap)
+                {
+                    server.sendRtspError(bev2connection.first, bev2connection.second.currentCseq, ret);
+                }
+            }
         });
     }
+}
+
+void RTSPServer::sendRtspError(struct bufferevent *bev, const int currentCseq, const int error)
+{
+    // 不用加锁, 调用它的函数已经加锁
+    std::string msg;
+    if (error == 404)
+    {
+        msg = RTSPNOTFOUND;
+    }
+    else
+    {
+        msg = RTSPSERVERBUSY;
+    }
+    std::ostringstream response(msg, std::ostringstream::ate);
+    response << NEWLINE
+             << "CSeq: " << currentCseq
+             << NEWLINE
+             << NEWLINE;
+    response.seekp(0, std::ostringstream::end);
+    const size_t len = response.tellp();
+    evbuffer_add(bufferevent_get_output(bev), response.str().c_str(), len);
 }
 
 void RTSPServer::sendDescribeSdp(struct bufferevent *bev, const int currentCseq, const std::string &sdp)
@@ -377,7 +404,7 @@ void RTSPServer::processPlayCommand(struct bufferevent *bev, const BaseCommand &
 
         long microseconds = 1e6 * fps.second / fps.first;
         struct timeval frameInterval = {0, microseconds};
-        pVideo->pPlayingEvent = event_new(mpBase, -1, EV_TIMEOUT | EV_PERSIST, writeFrameInEventLoop, const_cast<VideoRequest *>(&it->first));
+        pVideo->pPlayingEvent = event_new(bufferevent_get_base(bev), -1, EV_TIMEOUT | EV_PERSIST, writeFrameInEventLoop, const_cast<VideoRequest *>(&it->first));
         event_add(pVideo->pPlayingEvent, &frameInterval);
     }
 
@@ -395,15 +422,16 @@ void RTSPServer::processPlayCommand(struct bufferevent *bev, const BaseCommand &
 
 void RTSPServer::teardown(const VideoRequest& request) { 
     // 无需加锁, 调用者已经加锁了
-    LOG(INFO) << "to stop request " << request;
     VideoObject* pVideo = mProcessingVideoMap[request];
     if (pVideo->pPlayingEvent != NULL) {
         // event_del(pVideo->pPlayingEvent);
         // It is safe to call event_free() on an event that is pending or active:
         // doing so makes the event non-pending and inactive before deallocating it.
         event_free(pVideo->pPlayingEvent);
-        mpVideoManagerService->teardown(request);
+        LOG(INFO) << "to teardown request " << request;
+        mpVideoManagerService->teardownAsync(request);
     }
+    LOG(INFO) << "clear request " << request;
     mProcessingVideoMap.erase(request);
     delete pVideo;
 }
@@ -438,4 +466,24 @@ void RTSPServer::writeRtpData(const VideoRequest &url, uint8_t *data, size_t len
         evbuffer_add(bufferevent_get_output(bev2connection.first), pVideo->rtpHeader, 4);
         evbuffer_add(bufferevent_get_output(bev2connection.first), data, len);
     }
+}
+
+void RTSPServer::streamComplete(const VideoRequest& request)
+{
+    LOG(INFO) << "stream " << request << " complete, will close all connections";
+    std::unique_lock _(mMutex);
+    if (mProcessingVideoMap.count(request) == 0)
+    {
+        LOG(ERROR) << "unexcept error, request " << request << " not recorded";
+        return; // TODO: return 400
+    }
+    RTSPServer::VideoObject *pVideo = mProcessingVideoMap[request];
+    event_free(pVideo->pPlayingEvent);
+    for (const auto& bev2connection : pVideo->mBev2ConnectionMap)
+    {
+        evutil_closesocket(bufferevent_getfd(bev2connection.first));
+        bufferevent_free(bev2connection.first);
+    }
+    pVideo->mBev2ConnectionMap.clear();
+    mProcessingVideoMap.erase(request);
 }
