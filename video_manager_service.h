@@ -6,11 +6,13 @@
 #include <mutex>
 #include <shared_mutex>
 #include <string>
+#include <functional>
 extern "C" {
     #include <libavformat/avformat.h>
 }
 #include "CTPL/ctpl_stl.h"
 #include "common.h"
+#include "gb_manager_service.h"
 
 class VideoSink {
 public:
@@ -52,7 +54,7 @@ struct VideoContext {
     // TODO: deconstruct
 };
 
-typedef void (*AddVideoSourceCallback) (const VideoRequest& request, const int ret, const std::string& sdp);
+using AddVideoSourceCallback = std::function<void(const VideoRequest& request, const int ret, const std::string& sdp)>;
 
 class VideoManagerService {
 public:
@@ -62,7 +64,7 @@ public:
 
     void InitializeRpc(const std::string& rpcFromHost, const uint16_t& rpcFromPort);
 
-    void addAndProbeVideoSourceAsync(const VideoRequest& request, AddVideoSourceCallback callback);
+    void addAndProbeVideoSourceAsync(const VideoRequest& request, const AddVideoSourceCallback& callback);
 
     int getVideoFps(const VideoRequest& request, std::pair<uint32_t, uint32_t>& fps);
 
@@ -74,19 +76,24 @@ public:
 
 private:
     void finishingWork(const std::string& request); // 取流结束后的处理
-    void addAndProbeVideoSource(const VideoRequest request, AddVideoSourceCallback callback);
+    void addAndProbeVideoSource(const VideoRequest request, const AddVideoSourceCallback& callback);
     void getFrame(const VideoRequest request);
     int teardown(const VideoRequest request);
+
+    GbManagerService* gbService;
 
     ctpl::thread_pool* mpAddAndProbeVideoThreadPool;
     ctpl::thread_pool* mpGetAndSendFrameThreadPool;
     ctpl::thread_pool* mpTeardownThreadPool;
 
+    std::mutex mAddVideoCallbackMapMutex;
+    std::map<VideoRequest, AddVideoSourceCallback*> mRequest2AddVideoCallbackMap;
+
     // bool parseAndCheckUrl(const VideoRequest& request, VideoSourceParams& params);
     std::mutex mAddVideoMutex;
     // std::map<std::string, VideoSourceParams> mUrl2VideoSourceParamsMap;
     std::shared_mutex mVideoContextMapMutex;
-    std::map<VideoRequest, VideoContext*> mUrl2VideoContextMap;
+    std::map<VideoRequest, VideoContext*> mRequest2VideoContextMap;
 
 private:
     static VideoSink* videoSink; // TODO: 1. rtspserver 继承 videosink 2. vms 改为单例

@@ -30,14 +30,47 @@ void VideoManagerService::InitializeRpc(const std::string &rpcFromHost, const ui
     LOG(INFO) << "TODO: Initialize";
 }
 
-void VideoManagerService::addAndProbeVideoSourceAsync(const VideoRequest& request, AddVideoSourceCallback callback)
+void VideoManagerService::addAndProbeVideoSourceAsync(const VideoRequest& request, const AddVideoSourceCallback& callback)
 {
-    mpAddAndProbeVideoThreadPool->push([this, request, callback](int id) {
-        addAndProbeVideoSource(request, callback);
-    });
+    std::scoped_lock _(mAddVideoCallbackMapMutex);
+    if (mRequest2AddVideoCallbackMap.count(request) != 0)
+    {
+        LOG(ERROR) << "unexcept error, request " << request << " already added for probe";
+        std::string sdp;
+        callback(request, 500, sdp); // repeated request
+        return;
+    }
+    mRequest2AddVideoCallbackMap[request] = const_cast<AddVideoSourceCallback*>(&callback);
+    if (request._use_gb)
+    {
+        gbService->inviteAsync(request, [this](const VideoRequest& request, const int error) {
+                mpAddAndProbeVideoThreadPool->push([this, request, error](int id) {
+                    LOG(INFO) << "zapeng: invite finish";
+                    std::scoped_lock _(mAddVideoCallbackMapMutex);
+                    auto it = mRequest2AddVideoCallbackMap.find(request);
+                    if (it != mRequest2AddVideoCallbackMap.end()) // else: 不可能发生
+                    {
+                        AddVideoSourceCallback& callback = *it->second; // alias
+                        if (error != 0)
+                        {
+                            std::string sdp; // tmp
+                            callback(request, error, sdp);
+                            return;
+                        }
+                        addAndProbeVideoSourceAsync(request, callback);
+                    }
+                });
+            });
+    }
+    else
+    {
+        mpAddAndProbeVideoThreadPool->push([this, request, callback](int id) {
+            addAndProbeVideoSource(request, callback);
+        });
+    }
 }
 
-void VideoManagerService::addAndProbeVideoSource(const VideoRequest request, AddVideoSourceCallback callback)
+void VideoManagerService::addAndProbeVideoSource(const VideoRequest request, const AddVideoSourceCallback& callback)
 {
     VLOG(1) << "addAndProbeVideoSource. request: " << request;
 
@@ -69,7 +102,7 @@ void VideoManagerService::addAndProbeVideoSource(const VideoRequest request, Add
                 break;
             } // 以上可能会阻塞, 放在锁外面
             {
-                { 
+                {
                     // 拿写锁, 保存到 map 里面
                     std::unique_lock _(mVideoContextMapMutex);
                     AVStream *stream = iFmtCtx->streams[streamid];
@@ -82,7 +115,7 @@ void VideoManagerService::addAndProbeVideoSource(const VideoRequest request, Add
                     }
 
                     VideoContext *videoContext = new VideoContext(request.repeatedly, streamid, fps, iFmtCtx, oFmtCtx);
-                    auto [it, succ] = mUrl2VideoContextMap.insert(std::make_pair(request, videoContext));
+                    auto [it, succ] = mRequest2VideoContextMap.insert(std::make_pair(request, videoContext));
                     if (!succ)
                     {
                         LOG(ERROR) << "unexcept error, insert video context failed for request " << request;
@@ -172,16 +205,18 @@ void VideoManagerService::addAndProbeVideoSource(const VideoRequest request, Add
             }
         }
     }
+    std::scoped_lock _(mAddVideoCallbackMapMutex);
+    mRequest2AddVideoCallbackMap.erase(request);
 }
 
 int VideoManagerService::getVideoFps(const VideoRequest &request, std::pair<uint32_t, uint32_t> &fps)
 {
-    if (mUrl2VideoContextMap.count(request) == 0)
+    if (mRequest2VideoContextMap.count(request) == 0)
     {
         LOG(ERROR) << "not found video context for request" << request;
         return -1;
     }
-    fps = mUrl2VideoContextMap[request]->fps;
+    fps = mRequest2VideoContextMap[request]->fps;
     return 0;
 }
 
@@ -196,13 +231,13 @@ void VideoManagerService::getFrame(const VideoRequest request)
 {
     const auto t = std::chrono::system_clock::now();
     std::shared_lock _(mVideoContextMapMutex);
-    if (mUrl2VideoContextMap.count(request) == 0)
+    if (mRequest2VideoContextMap.count(request) == 0)
     {
         LOG(ERROR) << "no video context for request " << request;
         return;
         // FIXME: this is unexcept, what should do?
     }
-    VideoContext *videoContext = mUrl2VideoContextMap[request];
+    VideoContext *videoContext = mRequest2VideoContextMap[request];
     if (videoContext->mutex.try_lock())
     {
         // 用来过滤音频流
@@ -324,13 +359,13 @@ void VideoManagerService::getFrame(const VideoRequest request)
             if (ret != AVERROR(EAGAIN))
             {
                 std::shared_lock _(mVideoContextMapMutex);
-                if (mUrl2VideoContextMap.count(request) == 0)
+                if (mRequest2VideoContextMap.count(request) == 0)
                 {
                     LOG(ERROR) << "no video context for request " << request;
                     // FIXME: this is unexcept, what should do?
                     return;
                 }
-                VideoContext *videoContext = mUrl2VideoContextMap[request];
+                VideoContext *videoContext = mRequest2VideoContextMap[request];
                 std::scoped_lock videoLock(videoContext->mutex);
                 if (videoContext->finish)
                 {
@@ -365,12 +400,12 @@ void VideoManagerService::teardownAsync(const VideoRequest &request)
 int VideoManagerService::teardown(const VideoRequest request)
 {
     std::unique_lock _(mVideoContextMapMutex);
-    if (mUrl2VideoContextMap.count(request) == 0)
+    if (mRequest2VideoContextMap.count(request) == 0)
     {
         LOG(WARNING) << "request " << request << " not found, may not be added";
         return -1; // -1 表示没找到, 需要手动清理
     }
-    VideoContext *pVideoContext = mUrl2VideoContextMap[request];
+    VideoContext *pVideoContext = mRequest2VideoContextMap[request];
     avformat_close_input(&pVideoContext->iFmtCtx);
     if (pVideoContext->oFmtCtx != NULL)
     {
@@ -384,7 +419,7 @@ int VideoManagerService::teardown(const VideoRequest request)
     av_packet_free(&pVideoContext->pkt);
     av_free(pVideoContext->buf);
     delete pVideoContext;
-    mUrl2VideoContextMap.erase(request);
+    mRequest2VideoContextMap.erase(request);
     LOG(INFO) << "teardown " << request << " succ";
     return 0;
 }

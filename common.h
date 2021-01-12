@@ -35,6 +35,7 @@ public:
     bool _use_gb;
     std::string gbid;
     StreamingMode gbStreamingMode;
+    std::string gbPeerAddress;
 
     VideoRequest();
     ~VideoRequest();
