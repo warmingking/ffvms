@@ -1,0 +1,9 @@
+dependencies {
+    compile project(':ffvms-contract')
+    compile group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.0.1'
+    compile group: 'org.jsoup', name: 'jsoup', version: '1.11.3'
+    compile group: 'org.yaml', name: 'snakeyaml', version: '1.25'
+    compile group: 'javax.sip', name: 'jain-sip-ri', version: '1.3.0-91'
+    compile group: 'org.apache.commons', name: 'commons-lang3', version: '3.9'
+    compile group: 'com.google.guava', name: 'guava', version: '28.1-jre'
+}

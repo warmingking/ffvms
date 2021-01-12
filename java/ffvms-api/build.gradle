@@ -1,0 +1,16 @@
+jar {
+//    archiveBaseName = project.name
+    manifest {
+        attributes 'Main-Class': 'org.qunqun.ffvms.api.FfvmsApplication'
+    }
+
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
+
+dependencies {
+    compile group: 'io.netty', name: 'netty-all', version: '4.1.50.Final'
+    compile group: 'org.yaml', name: 'snakeyaml', version: '1.25'
+    compile group: 'org.apache.commons', name: 'commons-lang3', version: '3.10'
+}

@@ -1,0 +1,24 @@
+# rtsp 配置
+rtsp:
+  port: 8554
+  rtpPort: 18086
+  servletPath: /stream
+
+# http 配置
+http:
+  port: 8082
+  servletPath: /api
+
+video:
+  source:
+    rpcHost: 127.0.0.1
+    rpcPort: 10132
+    # 下面是国标的配置, onvif和multicast不需要额外的配置
+    rtpReceiveHost: 127.0.0.1
+    rtpReceivePort: 8086
+    defaultTransmission: UDP
+    tcpMode: POSITIVE
+    parseSsrc: false
+  process:
+    rtpPacketTimeout: 5
+    hevcToH264: false
