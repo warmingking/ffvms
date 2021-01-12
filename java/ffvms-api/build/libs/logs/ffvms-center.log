@@ -1,0 +1,92 @@
+23:45:38.904 - [main] WARN FfvmsApplication.java L19 - Usage: java -jar VpsApplication.jar configFilePath
+23:45:38.908 - [main] WARN FfvmsApplication.java L20 - Use default config...
+23:45:38.911 - [main] ERROR FfvmsApplication.java L39 - load config file ffvms-config.yml error: 
+java.nio.file.NoSuchFileException: ffvms-config.yml
+	at java.base/sun.nio.fs.UnixException.translateToIOException(UnixException.java:92)
+	at java.base/sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:111)
+	at java.base/sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:116)
+	at java.base/sun.nio.fs.UnixFileSystemProvider.newByteChannel(UnixFileSystemProvider.java:219)
+	at java.base/java.nio.file.Files.newByteChannel(Files.java:370)
+	at java.base/java.nio.file.Files.newByteChannel(Files.java:421)
+	at java.base/java.nio.file.spi.FileSystemProvider.newInputStream(FileSystemProvider.java:420)
+	at java.base/java.nio.file.Files.newInputStream(Files.java:155)
+	at org.qunqun.ffvms.api.FfvmsApplication.loadFfvmsConfig(FfvmsApplication.java:34)
+	at org.qunqun.ffvms.api.FfvmsApplication.main(FfvmsApplication.java:25)
+23:46:13.278 - [main] INFO FfvmsApplication.java L35 - load config file ../resources/main/ffvms-config.yml ...
+23:46:13.852 - [main] INFO RtspServer.java L78 - RTSP running port: 8554
+23:46:13.855 - [main] INFO RtspServer.java L83 - zapeng: 0 / 7
+23:46:14.020 - [main] INFO RtspServer.java L83 - zapeng: 1 / 7
+23:46:14.023 - [main] INFO RtspServer.java L83 - zapeng: 2 / 7
+23:46:14.037 - [main] INFO RtspServer.java L83 - zapeng: 3 / 7
+23:46:14.040 - [main] INFO RtspServer.java L83 - zapeng: 4 / 7
+23:46:14.044 - [main] INFO RtspServer.java L83 - zapeng: 5 / 7
+23:46:14.047 - [main] INFO RtspServer.java L83 - zapeng: 6 / 7
+23:48:42.172 - [epollEventLoopGroup-3-1] WARN ChannelInitializer.java L97 - Failed to initialize a channel. Closing: [id: 0x4f604a56, L:/127.0.0.1:8554 - R:/127.0.0.1:44388]
+java.lang.NullPointerException: null
+	at io.netty.channel.DefaultChannelHandlerContext.<init>(DefaultChannelHandlerContext.java:26)
+	at io.netty.channel.DefaultChannelPipeline.newContext(DefaultChannelPipeline.java:120)
+	at io.netty.channel.DefaultChannelPipeline.addLast(DefaultChannelPipeline.java:204)
+	at io.netty.channel.DefaultChannelPipeline.addLast(DefaultChannelPipeline.java:195)
+	at org.qunqun.ffvms.api.server.RtspServer$1.initChannel(RtspServer.java:69)
+	at org.qunqun.ffvms.api.server.RtspServer$1.initChannel(RtspServer.java:56)
+	at io.netty.channel.ChannelInitializer.initChannel(ChannelInitializer.java:129)
+	at io.netty.channel.ChannelInitializer.handlerAdded(ChannelInitializer.java:112)
+	at io.netty.channel.AbstractChannelHandlerContext.callHandlerAdded(AbstractChannelHandlerContext.java:938)
+	at io.netty.channel.DefaultChannelPipeline.callHandlerAdded0(DefaultChannelPipeline.java:609)
+	at io.netty.channel.DefaultChannelPipeline.access$100(DefaultChannelPipeline.java:46)
+	at io.netty.channel.DefaultChannelPipeline$PendingHandlerAddedTask.execute(DefaultChannelPipeline.java:1463)
+	at io.netty.channel.DefaultChannelPipeline.callHandlerAddedForAllHandlers(DefaultChannelPipeline.java:1115)
+	at io.netty.channel.DefaultChannelPipeline.invokeHandlerAddedIfNeeded(DefaultChannelPipeline.java:650)
+	at io.netty.channel.AbstractChannel$AbstractUnsafe.register0(AbstractChannel.java:502)
+	at io.netty.channel.AbstractChannel$AbstractUnsafe.access$200(AbstractChannel.java:417)
+	at io.netty.channel.AbstractChannel$AbstractUnsafe$1.run(AbstractChannel.java:474)
+	at io.netty.util.concurrent.AbstractEventExecutor.safeExecute(AbstractEventExecutor.java:164)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.runAllTasks(SingleThreadEventExecutor.java:472)
+	at io.netty.channel.epoll.EpollEventLoop.run(EpollEventLoop.java:387)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:989)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:834)
+23:55:01.744 - [main] INFO FfvmsApplication.java L35 - load config file ../resources/main/ffvms-config.yml ...
+23:55:02.153 - [main] INFO RtspServer.java L79 - RTSP running port: 8554
+23:55:02.155 - [main] INFO RtspServer.java L84 - zapeng: 0 / 7
+23:55:02.269 - [main] INFO RtspServer.java L84 - zapeng: 1 / 7
+23:55:02.272 - [main] INFO RtspServer.java L84 - zapeng: 2 / 7
+23:55:02.275 - [main] INFO RtspServer.java L84 - zapeng: 3 / 7
+23:55:02.278 - [main] INFO RtspServer.java L84 - zapeng: 4 / 7
+23:55:02.280 - [main] INFO RtspServer.java L84 - zapeng: 5 / 7
+23:55:02.298 - [main] INFO RtspServer.java L84 - zapeng: 6 / 7
+23:55:22.971 - [epollEventLoopGroup-3-2] WARN ChannelInitializer.java L97 - Failed to initialize a channel. Closing: [id: 0x5e4c3910, L:/127.0.0.1:8554 - R:/127.0.0.1:44392]
+io.netty.channel.ChannelPipelineException: org.qunqun.ffvms.api.server.RtspMessageProcessor is not a @Sharable handler, so can't be added or removed multiple times.
+	at io.netty.channel.DefaultChannelPipeline.checkMultiplicity(DefaultChannelPipeline.java:600)
+	at io.netty.channel.DefaultChannelPipeline.addLast(DefaultChannelPipeline.java:202)
+	at io.netty.channel.DefaultChannelPipeline.addLast(DefaultChannelPipeline.java:195)
+	at org.qunqun.ffvms.api.server.RtspServer$1.initChannel(RtspServer.java:70)
+	at org.qunqun.ffvms.api.server.RtspServer$1.initChannel(RtspServer.java:57)
+	at io.netty.channel.ChannelInitializer.initChannel(ChannelInitializer.java:129)
+	at io.netty.channel.ChannelInitializer.handlerAdded(ChannelInitializer.java:112)
+	at io.netty.channel.AbstractChannelHandlerContext.callHandlerAdded(AbstractChannelHandlerContext.java:938)
+	at io.netty.channel.DefaultChannelPipeline.callHandlerAdded0(DefaultChannelPipeline.java:609)
+	at io.netty.channel.DefaultChannelPipeline.access$100(DefaultChannelPipeline.java:46)
+	at io.netty.channel.DefaultChannelPipeline$PendingHandlerAddedTask.execute(DefaultChannelPipeline.java:1463)
+	at io.netty.channel.DefaultChannelPipeline.callHandlerAddedForAllHandlers(DefaultChannelPipeline.java:1115)
+	at io.netty.channel.DefaultChannelPipeline.invokeHandlerAddedIfNeeded(DefaultChannelPipeline.java:650)
+	at io.netty.channel.AbstractChannel$AbstractUnsafe.register0(AbstractChannel.java:502)
+	at io.netty.channel.AbstractChannel$AbstractUnsafe.access$200(AbstractChannel.java:417)
+	at io.netty.channel.AbstractChannel$AbstractUnsafe$1.run(AbstractChannel.java:474)
+	at io.netty.util.concurrent.AbstractEventExecutor.safeExecute(AbstractEventExecutor.java:164)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.runAllTasks(SingleThreadEventExecutor.java:472)
+	at io.netty.channel.epoll.EpollEventLoop.run(EpollEventLoop.java:387)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:989)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:834)
+23:56:06.339 - [main] INFO FfvmsApplication.java L35 - load config file ../resources/main/ffvms-config.yml ...
+23:56:06.761 - [main] INFO RtspServer.java L79 - RTSP running port: 8554
+23:56:06.764 - [main] INFO RtspServer.java L84 - zapeng: 0 / 7
+23:56:06.881 - [main] INFO RtspServer.java L84 - zapeng: 1 / 7
+23:56:06.883 - [main] INFO RtspServer.java L84 - zapeng: 2 / 7
+23:56:06.885 - [main] INFO RtspServer.java L84 - zapeng: 3 / 7
+23:56:06.887 - [main] INFO RtspServer.java L84 - zapeng: 4 / 7
+23:56:06.889 - [main] INFO RtspServer.java L84 - zapeng: 5 / 7
+23:56:06.905 - [main] INFO RtspServer.java L84 - zapeng: 6 / 7

@@ -1,0 +1,25 @@
+# gb28181 以下信息用于填写到国标平台
+sipId: 34020000012000000003
+host: 127.0.0.1
+port: 5060
+realm: 3402000001
+pwd: admin
+httpPort: 8083
+
+# 是否开启鉴权
+authorization: false
+# 是否开启订阅
+subscribe: true
+
+# 获取camera list的超时
+sipTimeout: 300
+# 任务重复时的策略
+inviteStrategy: REFRESH
+# sip取流的QPS(-1表示无限制)
+inviteQps: -1
+
+# rpc通信端口
+rpcPort: 10132
+
+# 最大支持的下载速率
+gbMaxSpeed: 4

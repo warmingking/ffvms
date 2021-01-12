@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "org.qunqun.ffvms.sipcontract.service";
+
+service SipService {
+    rpc receiveVideo (ReceiveVideoRequest) returns (ReceiveVideoResponse) {}
+    rpc sendAck(TaskRequest) returns (TaskResponse) {}
+    rpc teardown(TaskRequest) returns (TaskResponse) {}
+}
+
+message TimeInterval {
+    int64 startTime = 1;
+    int64 endTime = 2;
+}
+
+message ReceiveVideoRequest {
+    string deviceId = 1;
+    string cameraId = 2;
+    string receiveIP = 4;
+    int32 receivePort = 5;
+    TimeInterval interval = 3;
+    bool useTcp = 6;
+    bool tcpPositive = 7;
+    int32 speed = 8;
+}
+
+message ReceiveVideoResponse {
+    string taskKey = 1;
+}
+
+message TaskRequest {
+    string taskKey = 1;
+}
+
+message TaskResponse {
+    bool result = 1;
+}
