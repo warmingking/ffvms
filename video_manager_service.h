@@ -10,7 +10,7 @@
 extern "C" {
     #include <libavformat/avformat.h>
 }
-#include "CTPL/ctpl_stl.h"
+#include <ctpl_stl.h>
 #include "common.h"
 #include "gb_manager_service.h"
 

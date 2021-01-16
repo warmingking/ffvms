@@ -1,6 +1,0 @@
-[submodule "http-parser"]
-	path = http-parser
-	url = https://github.com/ploxiln/http-parser.git
-[submodule "CTPL"]
-	path = CTPL
-	url = https://github.com/vit-vit/CTPL.git

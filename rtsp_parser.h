@@ -4,7 +4,7 @@
 #include <map>
 #include <memory>
 #include <utility>
-#include "http-parser/http_parser.h"
+#include <http_parser.h>
 #include "common.h"
 
 struct BaseCommand {

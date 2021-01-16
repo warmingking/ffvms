@@ -10,3 +10,11 @@ compile_commands.json
 # compile and link
 *.o
 ffvms
+
+# project manager
+_deps
+gens
+CMakeFiles
+*.cmake
+CMakeCache.txt
+Makefile
