@@ -1,0 +1,111 @@
+00:49:39.879 - [main] ERROR org.qunqun.ffvms.mock.MockGbPlatform - Can't load MockConfigurations.yaml: 
+java.nio.file.NoSuchFileException: MockConfigurations.yaml
+	at java.base/sun.nio.fs.UnixException.translateToIOException(UnixException.java:92)
+	at java.base/sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:111)
+	at java.base/sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:116)
+	at java.base/sun.nio.fs.UnixFileSystemProvider.newByteChannel(UnixFileSystemProvider.java:219)
+	at java.base/java.nio.file.Files.newByteChannel(Files.java:370)
+	at java.base/java.nio.file.Files.newByteChannel(Files.java:421)
+	at java.base/java.nio.file.spi.FileSystemProvider.newInputStream(FileSystemProvider.java:420)
+	at java.base/java.nio.file.Files.newInputStream(Files.java:155)
+	at org.qunqun.ffvms.mock.MockGbPlatform.loadFromConfigFile(MockGbPlatform.java:48)
+	at org.qunqun.ffvms.mock.MockGbPlatform.main(MockGbPlatform.java:27)
+00:49:39.881 - [main] ERROR org.qunqun.ffvms.mock.MockGbPlatform - Start mock gb platform failed
+
+java.nio.file.NoSuchFileException: MockConfigurations.yaml
+	at java.base/sun.nio.fs.UnixException.translateToIOException(UnixException.java:92)
+	at java.base/sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:111)
+	at java.base/sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:116)
+	at java.base/sun.nio.fs.UnixFileSystemProvider.newByteChannel(UnixFileSystemProvider.java:219)
+	at java.base/java.nio.file.Files.newByteChannel(Files.java:370)
+	at java.base/java.nio.file.Files.newByteChannel(Files.java:421)
+	at java.base/java.nio.file.spi.FileSystemProvider.newInputStream(FileSystemProvider.java:420)
+	at java.base/java.nio.file.Files.newInputStream(Files.java:155)
+	at org.qunqun.ffvms.mock.MockGbPlatform.loadFromConfigFile(MockGbPlatform.java:48)
+	at org.qunqun.ffvms.mock.MockGbPlatform.main(MockGbPlatform.java:27)
+00:50:22.328 - [main] INFO  org.qunqun.ffvms.mock.MockGbPlatform - Starting mock with settings from /home/icefe/workspace/ffvms/java/ffvms-mock/MockConfigurations.yaml...
+00:50:22.522 - [main] INFO  org.qunqun.ffvms.mock.SipServer - Send first register
+00:50:27.060 - [Thread-0] INFO  org.qunqun.ffvms.mock.SipServer - Send first register
+00:51:47.674 - [main] INFO  org.qunqun.ffvms.mock.MockGbPlatform - Starting mock with settings from /home/icefe/workspace/ffvms/java/ffvms-mock/MockConfigurations.yaml...
+00:51:47.867 - [main] INFO  org.qunqun.ffvms.mock.SipServer - Send first register
+00:51:47.960 - [SipClient-UDPMessageChannelThread-0] INFO  org.qunqun.ffvms.mock.SipServer - Send second register
+00:51:47.969 - [SipClient-UDPMessageChannelThread-1] INFO  org.qunqun.ffvms.mock.SipServer - Register ok
+00:53:04.016 - [Thread-0] INFO  org.qunqun.ffvms.mock.SipServer - Send first register
+00:53:04.023 - [SipClient-UDPMessageChannelThread-2] INFO  org.qunqun.ffvms.mock.SipServer - Send second register
+00:53:04.028 - [SipClient-UDPMessageChannelThread-3] INFO  org.qunqun.ffvms.mock.SipServer - Register ok
+00:53:58.967 - [main] INFO  org.qunqun.ffvms.mock.MockGbPlatform - Starting mock with settings from /home/icefe/workspace/ffvms/java/ffvms-mock/MockConfigurations.yaml...
+00:53:59.179 - [main] INFO  org.qunqun.ffvms.mock.SipServer - Send first register
+00:53:59.275 - [SipClient-UDPMessageChannelThread-0] INFO  org.qunqun.ffvms.mock.SipServer - Send second register
+00:53:59.286 - [SipClient-UDPMessageChannelThread-1] INFO  org.qunqun.ffvms.mock.SipServer - Register ok
+00:58:48.679 - [Thread-0] INFO  org.qunqun.ffvms.mock.SipServer - Send first register
+00:58:48.736 - [SipClient-UDPMessageChannelThread-2] INFO  org.qunqun.ffvms.mock.SipServer - Send second register
+00:58:48.743 - [SipClient-UDPMessageChannelThread-3] INFO  org.qunqun.ffvms.mock.SipServer - Register ok
+00:59:03.513 - [main] INFO  org.qunqun.ffvms.mock.MockGbPlatform - Starting mock with settings from /home/icefe/workspace/ffvms/java/ffvms-mock/MockConfigurations.yaml...
+00:59:03.706 - [main] INFO  org.qunqun.ffvms.mock.SipServer - Send first register
+00:59:03.770 - [SipClient-UDPMessageChannelThread-0] INFO  org.qunqun.ffvms.mock.SipServer - Send second register
+00:59:03.778 - [SipClient-UDPMessageChannelThread-1] INFO  org.qunqun.ffvms.mock.SipServer - Register ok
+01:00:23.101 - [main] INFO  org.qunqun.ffvms.mock.MockGbPlatform - Starting mock with settings from /home/icefe/workspace/ffvms/java/ffvms-mock/MockConfigurations.yaml...
+01:00:23.303 - [main] INFO  org.qunqun.ffvms.mock.SipServer - Send first register
+01:00:23.409 - [SipClient-UDPMessageChannelThread-0] INFO  org.qunqun.ffvms.mock.SipServer - Send second register
+01:00:23.418 - [SipClient-UDPMessageChannelThread-1] INFO  org.qunqun.ffvms.mock.SipServer - Register ok
+01:00:23.996 - [SipClient-UDPMessageChannelThread-2] INFO  org.qunqun.ffvms.mock.SipServer - Send camera list 200 success
+01:12:22.964 - [main] INFO  org.qunqun.ffvms.mock.MockGbPlatform - Starting mock with settings from /home/icefe/workspace/ffvms/java/ffvms-mock/MockConfigurations.yaml...
+01:12:23.186 - [main] INFO  org.qunqun.ffvms.mock.SipServer - Send first register
+01:12:23.284 - [SipClient-UDPMessageChannelThread-0] INFO  org.qunqun.ffvms.mock.SipServer - Send second register
+01:12:23.294 - [SipClient-UDPMessageChannelThread-1] INFO  org.qunqun.ffvms.mock.SipServer - Register ok
+01:12:23.865 - [SipClient-UDPMessageChannelThread-2] INFO  org.qunqun.ffvms.mock.SipServer - Send camera list 200 success
+01:15:52.175 - [main] INFO  org.qunqun.ffvms.mock.MockGbPlatform - Starting mock with settings from /home/icefe/workspace/ffvms/java/ffvms-mock/MockConfigurations.yaml...
+01:15:52.396 - [main] INFO  org.qunqun.ffvms.mock.SipServer - Send first register
+01:15:52.494 - [SipClient-UDPMessageChannelThread-0] INFO  org.qunqun.ffvms.mock.SipServer - Send second register
+01:15:52.503 - [SipClient-UDPMessageChannelThread-1] INFO  org.qunqun.ffvms.mock.SipServer - Register ok
+01:15:53.031 - [SipClient-UDPMessageChannelThread-2] INFO  org.qunqun.ffvms.mock.SipServer - Send camera list 200 success
+01:22:05.106 - [main] INFO  org.qunqun.ffvms.mock.MockGbPlatform - Starting mock with settings from /home/icefe/workspace/ffvms/java/ffvms-mock/MockConfigurations.yaml...
+01:22:05.310 - [main] INFO  org.qunqun.ffvms.mock.SipServer - Send first register
+01:22:05.407 - [SipClient-UDPMessageChannelThread-0] INFO  org.qunqun.ffvms.mock.SipServer - Send second register
+01:22:05.419 - [SipClient-UDPMessageChannelThread-1] INFO  org.qunqun.ffvms.mock.SipServer - Register ok
+01:22:05.992 - [SipClient-UDPMessageChannelThread-2] INFO  org.qunqun.ffvms.mock.SipServer - Send camera list 200 success
+01:25:58.332 - [main] INFO  org.qunqun.ffvms.mock.MockGbPlatform - Starting mock with settings from /home/icefe/workspace/ffvms/java/ffvms-mock/MockConfigurations.yaml...
+01:25:58.560 - [main] INFO  org.qunqun.ffvms.mock.SipServer - Send first register
+01:25:58.646 - [SipClient-UDPMessageChannelThread-1] INFO  org.qunqun.ffvms.mock.SipServer - Send second register
+01:25:58.656 - [SipClient-UDPMessageChannelThread-2] INFO  org.qunqun.ffvms.mock.SipServer - Register ok
+01:25:59.246 - [SipClient-UDPMessageChannelThread-3] INFO  org.qunqun.ffvms.mock.SipServer - Send camera list 200 success
+01:26:03.814 - [SipClient-UDPMessageChannelThread-7] INFO  org.qunqun.ffvms.mock.SipServer - Camera 44020000011310000199 is using UDP port 46681
+01:26:03.815 - [SipClient-UDPMessageChannelThread-7] INFO  org.qunqun.ffvms.mock.SipServer - Dest rtp ip is: 127.0.0.1
+01:31:13.422 - [main] INFO  org.qunqun.ffvms.mock.MockGbPlatform - Starting mock with settings from /home/icefe/workspace/ffvms/java/ffvms-mock/MockConfigurations.yaml...
+01:31:13.653 - [main] INFO  org.qunqun.ffvms.mock.SipServer - Send first register
+01:31:13.762 - [SipClient-UDPMessageChannelThread-0] INFO  org.qunqun.ffvms.mock.SipServer - Send second register
+01:31:13.777 - [SipClient-UDPMessageChannelThread-1] INFO  org.qunqun.ffvms.mock.SipServer - Register ok
+01:31:14.554 - [SipClient-UDPMessageChannelThread-2] INFO  org.qunqun.ffvms.mock.SipServer - Send camera list 200 success
+01:31:17.850 - [SipClient-UDPMessageChannelThread-7] INFO  org.qunqun.ffvms.mock.SipServer - Camera 44020000011310000199 is using UDP port 36383
+01:31:17.851 - [SipClient-UDPMessageChannelThread-7] INFO  org.qunqun.ffvms.mock.SipServer - Dest rtp ip is: 127.0.0.1
+01:32:56.371 - [main] INFO  org.qunqun.ffvms.mock.MockGbPlatform - Starting mock with settings from /home/icefe/workspace/ffvms/java/ffvms-mock/MockConfigurations.yaml...
+01:32:56.577 - [main] INFO  org.qunqun.ffvms.mock.SipServer - Send first register
+01:32:56.679 - [SipClient-UDPMessageChannelThread-0] INFO  org.qunqun.ffvms.mock.SipServer - Send second register
+01:32:56.691 - [SipClient-UDPMessageChannelThread-1] INFO  org.qunqun.ffvms.mock.SipServer - Register ok
+01:32:57.427 - [SipClient-UDPMessageChannelThread-2] INFO  org.qunqun.ffvms.mock.SipServer - Send camera list 200 success
+01:33:01.913 - [SipClient-UDPMessageChannelThread-7] INFO  org.qunqun.ffvms.mock.SipServer - Camera 44020000011310000199 is using UDP port 46253
+01:33:01.914 - [SipClient-UDPMessageChannelThread-7] INFO  org.qunqun.ffvms.mock.SipServer - Dest rtp ip is: 127.0.0.1
+01:35:18.179 - [main] INFO  org.qunqun.ffvms.mock.MockGbPlatform - Starting mock with settings from /home/icefe/workspace/ffvms/java/ffvms-mock/MockConfigurations.yaml...
+01:35:18.396 - [main] INFO  org.qunqun.ffvms.mock.SipServer - Send first register
+01:35:18.489 - [SipClient-UDPMessageChannelThread-0] INFO  org.qunqun.ffvms.mock.SipServer - Send second register
+01:35:18.500 - [SipClient-UDPMessageChannelThread-1] INFO  org.qunqun.ffvms.mock.SipServer - Register ok
+01:35:19.241 - [SipClient-UDPMessageChannelThread-2] INFO  org.qunqun.ffvms.mock.SipServer - Send camera list 200 success
+01:35:24.646 - [SipClient-UDPMessageChannelThread-7] INFO  org.qunqun.ffvms.mock.SipServer - Camera 44020000011310000199 is using UDP port 37261
+01:35:24.646 - [SipClient-UDPMessageChannelThread-7] INFO  org.qunqun.ffvms.mock.SipServer - Dest rtp ip is: 127.0.0.1
+01:36:58.944 - [main] INFO  org.qunqun.ffvms.mock.MockGbPlatform - Starting mock with settings from /home/icefe/workspace/ffvms/java/ffvms-mock/MockConfigurations.yaml...
+01:36:59.151 - [main] INFO  org.qunqun.ffvms.mock.SipServer - Send first register
+01:36:59.246 - [SipClient-UDPMessageChannelThread-0] INFO  org.qunqun.ffvms.mock.SipServer - Send second register
+01:36:59.257 - [SipClient-UDPMessageChannelThread-1] INFO  org.qunqun.ffvms.mock.SipServer - Register ok
+01:36:59.987 - [SipClient-UDPMessageChannelThread-2] INFO  org.qunqun.ffvms.mock.SipServer - Send camera list 200 success
+01:37:05.605 - [SipClient-UDPMessageChannelThread-7] INFO  org.qunqun.ffvms.mock.SipServer - Camera 44020000011310000199 is using UDP port 41423
+01:37:05.605 - [SipClient-UDPMessageChannelThread-7] INFO  org.qunqun.ffvms.mock.SipServer - Dest rtp ip is: 127.0.0.1
+01:41:41.205 - [main] INFO  org.qunqun.ffvms.mock.MockGbPlatform - Starting mock with settings from /home/icefe/workspace/ffvms/java/ffvms-mock/MockConfigurations.yaml...
+01:41:41.413 - [main] INFO  org.qunqun.ffvms.mock.SipServer - Send first register
+01:41:41.534 - [SipClient-UDPMessageChannelThread-0] INFO  org.qunqun.ffvms.mock.SipServer - Send second register
+01:41:41.544 - [SipClient-UDPMessageChannelThread-1] INFO  org.qunqun.ffvms.mock.SipServer - Register ok
+01:41:42.321 - [SipClient-UDPMessageChannelThread-2] INFO  org.qunqun.ffvms.mock.SipServer - Send camera list 200 success
+01:41:44.639 - [SipClient-UDPMessageChannelThread-5] INFO  org.qunqun.ffvms.mock.SipServer - Camera 44020000011310000199 is using UDP port 44301
+01:41:44.639 - [SipClient-UDPMessageChannelThread-5] INFO  org.qunqun.ffvms.mock.SipServer - Dest rtp ip is: 127.0.0.1
+01:42:48.406 - [Thread-0] INFO  org.qunqun.ffvms.mock.SipServer - Send first register
+01:42:48.412 - [SipClient-UDPMessageChannelThread-7] INFO  org.qunqun.ffvms.mock.SipServer - Send second register
+01:42:48.416 - [SipClient-UDPMessageChannelThread-10] INFO  org.qunqun.ffvms.mock.SipServer - Logout success, cseq: 202

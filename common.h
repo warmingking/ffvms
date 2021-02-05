@@ -2,6 +2,7 @@
 #define COMMON_
 
 #include <string>
+#include <gflags/gflags.h>
 #include <glog/logging.h>
 
 #if __INTELLISENSE__
@@ -10,18 +11,24 @@
 
 void funcTrace();
 
-enum StreamingMode {
+enum StreamingMode
+{
     TCP,
     UDP
 };
 
-struct VideoRequest {
+struct VideoRequest
+{
 private:
-    inline std::string cmpStr() const {
+    inline std::string cmpStr() const
+    {
         std::string requestStr("");
-        if (_use_file) {
+        if (_use_file)
+        {
             requestStr = "file://" + filename;
-        } else if (_use_gb) {
+        }
+        else if (_use_gb)
+        {
             requestStr = "gb://" + gbid;
         }
         return requestStr;
@@ -29,33 +36,30 @@ private:
     std::string toString() const;
 
 public:
+    // 文件相关的参数
     bool _use_file;
     std::string filename;
     bool repeatedly;
+    // GB相关的参数
     bool _use_gb;
     std::string gbid;
     StreamingMode gbStreamingMode;
-    std::string gbPeerAddress;
 
     VideoRequest();
     ~VideoRequest();
 
-    static VideoRequest parseUrl(const std::string& url);
+    static VideoRequest parseUrl(const std::string &url);
 
-    friend std::ostream& operator<<(std::ostream& os, const VideoRequest& request);
+    friend std::ostream &operator<<(std::ostream &os, const VideoRequest &request);
 
-    bool operator<(const VideoRequest& other) const
+    bool operator<(const VideoRequest &other) const
     {
         return this->cmpStr() < other.cmpStr();
     }
 
-    inline bool valueAndParamsEqual(const VideoRequest& other) const {
-        return (_use_file == other._use_file)
-               && (filename == other.filename)
-               && (repeatedly == other.repeatedly)
-               && (_use_gb == other._use_gb)
-               && (gbid == other.gbid)
-               && (gbStreamingMode == other.gbStreamingMode);
+    inline bool valueAndParamsEqual(const VideoRequest &other) const
+    {
+        return (_use_file == other._use_file) && (filename == other.filename) && (repeatedly == other.repeatedly) && (_use_gb == other._use_gb) && (gbid == other.gbid) && (gbStreamingMode == other.gbStreamingMode);
     }
 };
 
@@ -64,21 +68,25 @@ namespace std
     template <>
     struct hash<VideoRequest>
     {
-        size_t operator()(const VideoRequest& r) const
+        size_t operator()(const VideoRequest &r) const
         {
             // Compute hash of request string
             std::string requestStr("");
-            if (r._use_file) {
+            if (r._use_file)
+            {
                 requestStr = "file://" + r.filename;
-            } else if (r._use_gb) {
+            }
+            else if (r._use_gb)
+            {
                 requestStr = "gb://" + r.gbid;
             }
             return hash<std::string>{}(requestStr);
         }
     };
-}
+} // namespace std
 
-enum RTSPCommand {
+enum RTSPCommand
+{
     UNKNOWN = 0,
     OPTIONS,
     DESCRIBE,

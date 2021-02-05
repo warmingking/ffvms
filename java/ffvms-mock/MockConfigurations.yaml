@@ -1,0 +1,12 @@
+sipId: 34020000012000000003
+sipHost: 127.0.0.1
+sipPort: 5060
+mockHost: 127.0.0.1
+mockPort: 5061
+mockDeviceId: 44020000012000000003
+mockCameraNum: 200
+# "-1" means infinite loop
+mockVideoLoopTimes: -1
+mockVideoPath:
+  - 1.mp4
+  - 2.mp4

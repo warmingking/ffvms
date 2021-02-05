@@ -43,14 +43,14 @@ public:
 public:
     static RTSPServer& getInstance();
     virtual ~RTSPServer();
-    void start(int port);
+    void start(uint16_t port);
 
 private:
     RTSPServer();
     RTSPServer(const RTSPServer&);
     RTSPServer& operator=(const RTSPServer&);
 
-    int mPort;
+    uint16_t mPort;
     VideoManagerService* mpVideoManagerService;
 
 public:

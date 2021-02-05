@@ -2,5 +2,4 @@ rootProject.name = 'ffvms'
 include 'ffvms-sipper'
 include 'ffvms-contract'
 include 'ffvms-api'
-include 'ffvms-session'
-
+include 'ffvms-mock'

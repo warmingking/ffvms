@@ -1,0 +1,47 @@
+ffvms/GBInviteRequest.java
+ ffvms.GBInviteRequest
+ ffvms.GBInviteRequest$1
+ ffvms.GBInviteRequest$Builder
+ffvms/videogreeterGrpc.java
+ ffvms.videogreeterGrpc
+ ffvms.videogreeterGrpc$1
+ ffvms.videogreeterGrpc$2
+ ffvms.videogreeterGrpc$3
+ ffvms.videogreeterGrpc$MethodHandlers
+ ffvms.videogreeterGrpc$videogreeterBaseDescriptorSupplier
+ ffvms.videogreeterGrpc$videogreeterBlockingStub
+ ffvms.videogreeterGrpc$videogreeterFileDescriptorSupplier
+ ffvms.videogreeterGrpc$videogreeterFutureStub
+ ffvms.videogreeterGrpc$videogreeterImplBase
+ ffvms.videogreeterGrpc$videogreeterMethodDescriptorSupplier
+ ffvms.videogreeterGrpc$videogreeterStub
+ffvms/InviteResponse.java
+ ffvms.InviteResponse
+ ffvms.InviteResponse$1
+ ffvms.InviteResponse$Builder
+ffvms/InviteRequestOrBuilder.java
+ ffvms.InviteRequestOrBuilder
+ffvms/InviteResponseOrBuilder.java
+ ffvms.InviteResponseOrBuilder
+ffvms/VideoGreeter.java
+ ffvms.VideoGreeter
+ffvms/TaskRequest.java
+ ffvms.TaskRequest
+ ffvms.TaskRequest$1
+ ffvms.TaskRequest$Builder
+ffvms/TaskRequestOrBuilder.java
+ ffvms.TaskRequestOrBuilder
+ffvms/BaseResponse.java
+ ffvms.BaseResponse
+ ffvms.BaseResponse$1
+ ffvms.BaseResponse$Builder
+ffvms/InviteRequest.java
+ ffvms.InviteRequest
+ ffvms.InviteRequest$1
+ ffvms.InviteRequest$2
+ ffvms.InviteRequest$Builder
+ ffvms.InviteRequest$InviteOneofCase
+ffvms/BaseResponseOrBuilder.java
+ ffvms.BaseResponseOrBuilder
+ffvms/GBInviteRequestOrBuilder.java
+ ffvms.GBInviteRequestOrBuilder

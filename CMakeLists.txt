@@ -18,7 +18,7 @@ FetchContent_Declare(
     glog
     GIT_REPOSITORY https://github.com/google/glog
     GIT_TAG        v0.4.0
-    PATCH_COMMAND  git apply "${CMAKE_CURRENT_BINARY_DIR}/patches/glog.patch"
+    PATCH_COMMAND  git apply "${CMAKE_CURRENT_SOURCE_DIR}/patches/glog.patch"
 )
 
 FetchContent_Declare(
@@ -34,6 +34,7 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(gflags glog gRPC libevent)
+message("hhhhhhhhhhhh", "${gflags_BINARY_DIR}/include")
 target_include_directories(glog PRIVATE "${gflags_BINARY_DIR}/include")
 
 FetchContent_Declare(
@@ -80,48 +81,45 @@ set(_GRPC_GRPCPP grpc++)
 set(_GRPC_CPP_PLUGIN_EXECUTABLE $<TARGET_FILE:grpc_cpp_plugin>)
 
 # Proto file
-get_filename_component(gb_proto "./java/ffvms-contract/src/main/proto/sipper.proto" ABSOLUTE)
-get_filename_component(gb_proto_path "${gb_proto}" PATH)
+get_filename_component(vg_proto "video_greeter.proto" ABSOLUTE)
+get_filename_component(vg_proto_path "${vg_proto}" PATH)
 
 # Generated sources
 set(proto_gens "${CMAKE_CURRENT_BINARY_DIR}/gens")
-set(gb_proto_srcs "${proto_gens}/sipper.pb.cc")
-set(gb_proto_hdrs "${proto_gens}/sipper.pb.h")
-set(gb_grpc_srcs "${proto_gens}/sipper.grpc.pb.cc")
-set(gb_grpc_hdrs "${proto_gens}/sipper.grpc.pb.h")
+set(vg_proto_srcs "${proto_gens}/video_greeter.pb.cc")
+set(vg_proto_hdrs "${proto_gens}/video_greeter.pb.h")
+set(vg_grpc_srcs "${proto_gens}/video_greeter.grpc.pb.cc")
+set(vg_grpc_hdrs "${proto_gens}/video_greeter.grpc.pb.h")
 
 add_custom_command(
-    OUTPUT "${gb_proto_srcs}" "${gb_proto_hdrs}" "${gb_grpc_srcs}" "${gb_grpc_hdrs}"
+    OUTPUT "${vg_proto_srcs}" "${vg_proto_hdrs}" "${vg_grpc_srcs}" "${vg_grpc_hdrs}"
     COMMAND ${_PROTOBUF_PROTOC}
     ARGS --grpc_out "${proto_gens}"
          --cpp_out "${proto_gens}"
-         -I "${gb_proto_path}"
-         --plugin=protoc-gen-grpc="${_GRPC_CPP_PLUGIN_EXECUTABLE}" "${gb_proto}"
-    DEPENDS "${gb_proto}")
+         -I "${vg_proto_path}"
+         --plugin=protoc-gen-grpc="${_GRPC_CPP_PLUGIN_EXECUTABLE}" "${vg_proto}"
+    DEPENDS "${vg_proto}")
 
-# Include generated *.pb.h files
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}" "${ctpl_SOURCE_DIR}" "${http-parser_SOURCE_DIR}" "${proto_gens}")
 
-include_directories("${CMAKE_CURRENT_BINARY_DIR}" "${ctpl_SOURCE_DIR}" "${http-parser_SOURCE_DIR}")
-
-# Targets greeter_[async_](client|server)
-add_executable(ffvms 
+add_executable(ffvms
     ffvms.cpp
     rtsp_server.cpp
     video_manager_service.cpp
-    gb_manager_service.cpp
+    network_server.cpp
     rtsp_parser.cpp
     common.cpp
-    ${gb_proto_srcs}
-    ${gb_grpc_srcs})
+    ${vg_proto_srcs}
+    ${vg_grpc_srcs})
 
 target_link_libraries(ffvms
     gflags
     glog
     event_core
     event_pthreads
-    avutil
     avformat
     avcodec
+    avutil
     http-parser
     ${_REFLECTION}
     ${_GRPC_GRPCPP}

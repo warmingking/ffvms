@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+package ffvms;
+
+service videogreeter {
+    rpc inviteVideo (InviteRequest) returns (InviteResponse) {}
+    rpc sendAck(BaseRequest) returns (BaseResponse) {}
+    rpc teardown(BaseRequest) returns (BaseResponse) {}
+}
+
+message BaseRequest {
+    string id = 1;
+}
+
+message BaseResponse {
+    int32 code = 1;
+    string msg = 2;
+}
+
+message InviteRequest {
+    oneof invite_oneof {
+        GBInviteRequest gbInviteRequest = 1;
+    }
+}
+
+message GBInviteRequest {
+    string cameraId = 1;
+    string receiveIP = 2;
+    int32 receivePort = 3;
+    uint64 startTime = 4;
+    uint64 endTime = 5;
+    bool useTcp = 6;
+    bool tcpPositive = 7;
+    int32 speed = 8;
+}
+
+message InviteResponse {
+    BaseResponse ret = 1;
+    string peerInfo = 2;
+}

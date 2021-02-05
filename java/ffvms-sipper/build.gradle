@@ -1,3 +1,11 @@
+jar {
+    manifest {
+        attributes(
+            'Main-Class': 'org.qunqun.ffvms.sipper.SipperDaemon'
+        )
+    }
+}
+
 dependencies {
     compile project(':ffvms-contract')
     compile group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.0.1'
