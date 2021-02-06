@@ -1,106 +1,85 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.13)
 project(ffvms)
-include(FetchContent)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(FETCHCONTENT_QUIET OFF)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
 
-find_package(FFMPEG QUIET)
+find_package(gRPC QUIET)
+find_package(Protobuf QUIET)
+find_library(HTTP_PARSER_LIB http_parser)
+find_program(PROTOC_EXECUTABLE protoc)
+find_program(GRPC_CPP_PLUGIN grpc_cpp_plugin)
 
-FetchContent_Declare(
-    gflags
-    GIT_REPOSITORY https://github.com/gflags/gflags
-    GIT_TAG        v2.2.2
-)
+set(_PROTOBUF_LIBPROTOBUF protobuf::libprotobuf)
+set(_REFLECTION gRPC::grpc++_reflection)
 
-FetchContent_Declare(
-    glog
-    GIT_REPOSITORY https://github.com/google/glog
-    GIT_TAG        v0.4.0
-    PATCH_COMMAND  git apply "${CMAKE_CURRENT_SOURCE_DIR}/patches/glog.patch"
-)
+function(PROTOBUF_GENERATE_GRPC_CPP SRCS HDRS GENERATED_DIR)
+  if(NOT ARGN)
+    message(SEND_ERROR "Error: PROTOBUF_GENERATE_GRPC_CPP() called without any proto files")
+    return()
+  endif()
 
-FetchContent_Declare(
-    libevent
-    GIT_REPOSITORY https://github.com/libevent/libevent
-    GIT_TAG        release-2.1.12-stable
-)
+  file(MAKE_DIRECTORY ${GENERATED_DIR})
 
-FetchContent_Declare(
-    gRPC
-    GIT_REPOSITORY https://github.com/grpc/grpc
-    GIT_TAG        v1.34.1
-)
+  if(PROTOBUF_GENERATE_CPP_APPEND_PATH) # This variable is common for all types of output.
+    # Create an include path for each file specified
+    foreach(FIL ${ARGN})
+      get_filename_component(ABS_FIL ${FIL} ABSOLUTE)
+      get_filename_component(ABS_PATH ${ABS_FIL} PATH)
+      list(FIND _protobuf_include_path ${ABS_PATH} _contains_already)
+      if(${_contains_already} EQUAL -1)
+          list(APPEND _protobuf_include_path -I ${ABS_PATH})
+      endif()
+    endforeach()
+  else()
+    set(_protobuf_include_path -I ${CMAKE_CURRENT_SOURCE_DIR})
+  endif()
 
-FetchContent_MakeAvailable(gflags glog gRPC libevent)
-message("hhhhhhhhhhhh", "${gflags_BINARY_DIR}/include")
-target_include_directories(glog PRIVATE "${gflags_BINARY_DIR}/include")
+  if(DEFINED PROTOBUF_IMPORT_DIRS)
+    foreach(DIR ${Protobuf_IMPORT_DIRS})
+      get_filename_component(ABS_PATH ${DIR} ABSOLUTE)
+      list(FIND _protobuf_include_path ${ABS_PATH} _contains_already)
+      if(${_contains_already} EQUAL -1)
+          list(APPEND _protobuf_include_path -I ${ABS_PATH})
+      endif()
+    endforeach()
+  endif()
 
-FetchContent_Declare(
-    ctpl
-    GIT_REPOSITORY https://github.com/vit-vit/CTPL.git
-    GIT_TAG        ctpl_v.0.0.2
-)
+  set(${SRCS})
+  set(${HDRS})
+  foreach(FIL ${ARGN})
+    get_filename_component(ABS_FIL ${FIL} ABSOLUTE)
+    get_filename_component(FIL_WE ${FIL} NAME_WE)
 
-FetchContent_GetProperties(ctpl)
-if (NOT ctpl_POPULATED)
-  FetchContent_Populate(ctpl)
-endif ()
+    list(APPEND ${SRCS} "${GENERATED_DIR}/${FIL_WE}.pb.cc")
+    list(APPEND ${SRCS} "${GENERATED_DIR}/${FIL_WE}.grpc.pb.cc")
+    list(APPEND ${HDRS} "${GENERATED_DIR}/${FIL_WE}.pb.h")
+    list(APPEND ${HDRS} "${GENERATED_DIR}/${FIL_WE}.grpc.pb.h")
 
-FetchContent_Declare(
-    http-parser
-    GIT_REPOSITORY https://github.com/ploxiln/http-parser
-    GIT_TAG        master
-)
+    add_custom_command(
+      OUTPUT "${GENERATED_DIR}/${FIL_WE}.pb.cc"
+             "${GENERATED_DIR}/${FIL_WE}.grpc.pb.cc"
+             "${GENERATED_DIR}/${FIL_WE}.pb.h"
+             "${GENERATED_DIR}/${FIL_WE}.grpc.pb.h"
+      COMMAND ${PROTOC_EXECUTABLE}
+      ARGS --grpc_out=${GENERATED_DIR}
+           --cpp_out=${GENERATED_DIR}
+           --plugin=protoc-gen-grpc=${GRPC_CPP_PLUGIN}
+           ${_protobuf_include_path} ${ABS_FIL}
+      DEPENDS ${ABS_FIL} ${PROTOC_EXECUTABLE}
+      COMMENT "Running gRPC C++ protocol buffer compiler on ${FIL}"
+      VERBATIM)
+  endforeach()
 
-FetchContent_GetProperties(http-parser)
-if (NOT http-parser_POPULATED)
-  FetchContent_Populate(http-parser)
-endif ()
+  set(${SRCS} ${${SRCS}} PARENT_SCOPE)
+  set(${HDRS} ${${HDRS}} PARENT_SCOPE)
+  include_directories(${GENERATED_DIR})
+endfunction()
 
-add_custom_command(
-    OUTPUT ${http-parser_SOURCE_DIR}/libhttp_parser.a
-    COMMAND make
-    ARGS package
-    WORKING_DIRECTORY ${http-parser_SOURCE_DIR}
-    COMMENT "build http-parser"
-    VERBATIM
-)
-add_custom_target(http-parser-package DEPENDS ${http-parser_SOURCE_DIR}/libhttp_parser.a)
-add_library(http-parser STATIC IMPORTED)
-set_target_properties(http-parser PROPERTIES
-    IMPORTED_LOCATION ${http-parser_SOURCE_DIR}/libhttp_parser.a)
-add_dependencies(http-parser http-parser-package)
-
-set(_PROTOBUF_LIBPROTOBUF libprotobuf)
-set(_REFLECTION grpc++_reflection)
-set(_PROTOBUF_PROTOC $<TARGET_FILE:protoc>)
-
-set(_GRPC_GRPCPP grpc++)
-set(_GRPC_CPP_PLUGIN_EXECUTABLE $<TARGET_FILE:grpc_cpp_plugin>)
-
-# Proto file
-get_filename_component(vg_proto "video_greeter.proto" ABSOLUTE)
-get_filename_component(vg_proto_path "${vg_proto}" PATH)
-
-# Generated sources
-set(proto_gens "${CMAKE_CURRENT_BINARY_DIR}/gens")
-set(vg_proto_srcs "${proto_gens}/video_greeter.pb.cc")
-set(vg_proto_hdrs "${proto_gens}/video_greeter.pb.h")
-set(vg_grpc_srcs "${proto_gens}/video_greeter.grpc.pb.cc")
-set(vg_grpc_hdrs "${proto_gens}/video_greeter.grpc.pb.h")
-
-add_custom_command(
-    OUTPUT "${vg_proto_srcs}" "${vg_proto_hdrs}" "${vg_grpc_srcs}" "${vg_grpc_hdrs}"
-    COMMAND ${_PROTOBUF_PROTOC}
-    ARGS --grpc_out "${proto_gens}"
-         --cpp_out "${proto_gens}"
-         -I "${vg_proto_path}"
-         --plugin=protoc-gen-grpc="${_GRPC_CPP_PLUGIN_EXECUTABLE}" "${vg_proto}"
-    DEPENDS "${vg_proto}")
-
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}" "${ctpl_SOURCE_DIR}" "${http-parser_SOURCE_DIR}" "${proto_gens}")
+PROTOBUF_GENERATE_GRPC_CPP(GRPC_VIDEO_GREETER_SRCS
+                           GRPC_VIDEO_GREETER_HDRS
+                           "${CMAKE_CURRENT_BINARY_DIR}/gens"
+                           "${CMAKE_CURRENT_SOURCE_DIR}/video_greeter.proto")
 
 add_executable(ffvms
     ffvms.cpp
@@ -109,8 +88,7 @@ add_executable(ffvms
     network_server.cpp
     rtsp_parser.cpp
     common.cpp
-    ${vg_proto_srcs}
-    ${vg_grpc_srcs})
+    ${GRPC_VIDEO_GREETER_SRCS})
 
 target_link_libraries(ffvms
     gflags
@@ -120,7 +98,6 @@ target_link_libraries(ffvms
     avformat
     avcodec
     avutil
-    http-parser
+    ${HTTP_PARSER_LIB}
     ${_REFLECTION}
-    ${_GRPC_GRPCPP}
     ${_PROTOBUF_LIBPROTOBUF})

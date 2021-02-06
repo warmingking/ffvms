@@ -1,20 +1,14 @@
 # ide
 .vscode
+.devcontainer
 
 # code analysis
-compile_commands.json
 *.srctrlbm
 *.srctrldb
 *.srctrlprj
 
 # compile and link
 *.o
-ffvms
 
 # project manager
-_deps
-gens
-CMakeFiles
-*.cmake
-CMakeCache.txt
-Makefile
+build

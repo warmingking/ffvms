@@ -1,7 +1,7 @@
 #ifndef __NETWORK_SERVER_H__
 #define __NETWORK_SERVER_H__
 
-#include <ctpl_stl.h>
+#include <ctpl/ctpl_stl.h>
 
 #include <map>
 #include <queue>

@@ -11,7 +11,7 @@
 extern "C" {
 #include <libavformat/avformat.h>
 }
-#include <ctpl_stl.h>
+#include <ctpl/ctpl_stl.h>
 #include <video_greeter.grpc.pb.h>
 
 #include "common.h"
