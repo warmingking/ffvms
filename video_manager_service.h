@@ -79,7 +79,10 @@ class VideoManagerService {
 
     NetworkServer* networkServer;
 
-    ctpl::thread_pool* mpAddAndProbeVideoThreadPool;
+    ctpl::thread_pool* mpProbeVideoThreadPool;
+    std::mutex mProbeVideoOnlineThreadPoolMutex;
+    std::map<std::thread::id, std::pair<std::thread, bool>> mProbeVideoOnlineThreadPool;
+    std::thread mProbeVideoOnlineThreadPoolCleanThread;
     ctpl::thread_pool* mpGetAndSendFrameThreadPool;
     ctpl::thread_pool* mpTeardownThreadPool;
 

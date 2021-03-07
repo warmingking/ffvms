@@ -312,7 +312,7 @@ void RTSPServer::processPlayCommand(struct bufferevent *bev, const BaseCommand &
             return;
         }
 
-        long microseconds = 1e6 * fps.second / fps.first;
+        long microseconds = 7 * 1e6 * fps.second / fps.first / 10;
         struct timeval frameInterval = {0, microseconds};
         pVideo->pPlayingEvent =
             event_new(bufferevent_get_base(bev), -1, EV_TIMEOUT | EV_PERSIST, writeFrameInEventLoop, const_cast<VideoRequest *>(&it->first));

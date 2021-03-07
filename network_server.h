@@ -21,45 +21,25 @@ class NetworkServer {
         RTPPacket() { buf = new unsigned char[bufSize]; }
 
         ~RTPPacket() { delete[] buf; }
-
-        bool operator<(const RTPPacket& other) const { return this->increasingSeq < other.increasingSeq; }
     };
 
     struct RAIIRTPPacket {
         std::shared_ptr<RTPPacket> pPacket;
-        bool operator<(const RAIIRTPPacket& other) const { return this->pPacket > other.pPacket; }
+        bool operator<(const RAIIRTPPacket& other) const { return this->pPacket->increasingSeq > other.pPacket->increasingSeq; }
 
         RAIIRTPPacket() { pPacket = std::make_shared<RTPPacket>(); }
     };
 
-    // template <class T>
-    // struct CycleList {
-    //     std::mutex mutex;  // this is thread safe
-    //     size_t perimeter;
-    //     size_t readCursor;
-    //     size_t dataLen;
-    //     T* data;
-
-    //     void appendData(const T* data, const size_t len);
-    //     void getAllData(T* data, size_t& len);
-
-    //     CycleList() = delete;
-    //     CycleList(const size_t len) : perimeter(len) { data = new T[len]; }
-    //     ~CycleList() { delete[] data; }
-    // };
-
     struct RTPData {
-        static const size_t cacheSize = 1000;
+        static const size_t cacheSize = 10000; // 每路最多缓存 5000 个包
         static const size_t tolerant = 20;
         // static const size_t dataSize = 4 * 1024 * 1024;  // 1s 的数据
         std::mutex mutex;
         std::priority_queue<RAIIRTPPacket> packetCacheQueue;
         uint64_t currentSeq;  // use increasingSeq
         bool isProbeFinish;
-        // std::shared_ptr<CycleList<unsigned char>> data;  // cycle cache
 
         RTPData() : currentSeq(0), isProbeFinish(false) {}
-        // RTPData() : currentSeq(0) { data = std::make_shared<CycleList<unsigned char>>(dataSize); }
     };
 
    private:

@@ -2,11 +2,10 @@ cmake_minimum_required(VERSION 3.13)
 project(ffvms)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
 
 find_package(gRPC QUIET)
 find_package(Protobuf QUIET)
-find_library(HTTP_PARSER_LIB http_parser)
+find_library(HTTP_PARSER_LIB libhttp_parser.a) # for libraries not managed by cmake, we prefer static library
 find_program(PROTOC_EXECUTABLE protoc)
 find_program(GRPC_CPP_PLUGIN grpc_cpp_plugin)
 
@@ -71,6 +70,7 @@ function(PROTOBUF_GENERATE_GRPC_CPP SRCS HDRS GENERATED_DIR)
       VERBATIM)
   endforeach()
 
+  set_source_files_properties(${${SRCS}} ${${HDRS}} PROPERTIES GENERATED TRUE)
   set(${SRCS} ${${SRCS}} PARENT_SCOPE)
   set(${HDRS} ${${HDRS}} PARENT_SCOPE)
   include_directories(${GENERATED_DIR})
@@ -90,6 +90,8 @@ add_executable(ffvms
     common.cpp
     ${GRPC_VIDEO_GREETER_SRCS})
 
+# target_include_directories(ffvms PRIVATE ${GRPC_VIDEO_GREETER_HDRS})
+
 target_link_libraries(ffvms
     gflags
     glog
@@ -101,3 +103,5 @@ target_link_libraries(ffvms
     ${HTTP_PARSER_LIB}
     ${_REFLECTION}
     ${_PROTOBUF_LIBPROTOBUF})
+
+set_property(TARGET ffvms PROPERTY CXX_STANDARD 17)

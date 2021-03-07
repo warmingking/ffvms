@@ -9,7 +9,7 @@
 
 static const size_t bufSize = 1024 * 1024;
 #define RTP_FLAG_MARKER 0x2
-#include <fstream>
+
 void NetworkServer::parsePacket(NetworkServer::RAIIRTPPacket &packet)
 {
     packet.pPacket->dataIdx = 0;
@@ -74,18 +74,6 @@ void NetworkServer::parsePacket(NetworkServer::RAIIRTPPacket &packet)
         packet.pPacket->dataLen -= ext;
         packet.pPacket->dataIdx += ext;
     }
-    // LOG_EVERY_N(INFO, 100) << "get packet length: " << packet.pPacket->dataLen
-    //                        << " data index: " << packet.pPacket->dataIdx;
-    std::ofstream fout;
-    fout.open("file.receive", std::ios::binary | std::ios::app);
-
-    VLOG(1) << "zapeng: seq " << packet.pPacket->seq;
-    long pos = fout.tellp();
-    fout.seekp(pos);
-    fout.write((char *)&packet.pPacket->buf[packet.pPacket->dataIdx], packet.pPacket->dataLen);
-
-    fout.close();
-    // LOG_EVERY_N(INFO, 1000) << "dump to file";
 }
 
 void NetworkServer::startUDPIOLoop(int sock)
@@ -132,6 +120,7 @@ void NetworkServer::startUDPIOLoop(int sock)
                     uint64_t seqModed = it->second->currentSeq % std::numeric_limits<uint16_t>::max();
                     // LOG(INFO) << "xxx seq " << seqModed << " vs " << packet.pPacket->seq;
                     if (packet.pPacket->seq < seqModed)
+                    {
                         if (seqModed - packet.pPacket->seq > std::numeric_limits<int16_t>::max())
                         {
                             while (packet.pPacket->increasingSeq < it->second->currentSeq)
@@ -144,20 +133,19 @@ void NetworkServer::startUDPIOLoop(int sock)
                             LOG(WARNING) << "rtp packet reach delayed " << seqModed - packet.pPacket->seq << " packets";
                             return;
                         }
+                    }
                 }
                 else
                 {
                     it->second->currentSeq = packet.pPacket->seq;
                 }
-                // LOG(INFO) << "rtp packet current seq " << it->second->currentSeq << ", increasingseq " << packet.pPacket->increasingSeq;
                 std::scoped_lock queueLock(it->second->mutex);
                 if (it->second->packetCacheQueue.size() == NetworkServer::RTPData::cacheSize)
                 {
-                    // LOG(ERROR) << "cache full";
+                    LOG(ERROR) << "cache full";
                     return;
                 }
                 it->second->packetCacheQueue.push((packet)); // TODO: std::move
-                // LOG(INFO) << "pushhhhhhhhhhhhhh, queue size: " << it->second->packetCacheQueue.size();
             });
         },
         this);
@@ -182,7 +170,8 @@ void NetworkServer::initUDPServer(uint16_t port)
         LOG(FATAL) << "couldn't bind udp port " << port;
     }
 
-    // for (int i = 0; i != mpUDPIOThreadPool->size(); ++i) {
+    // for (int i = 0; i != mpUDPIOThreadPool->size(); ++i)
+    // {
     //     mpUDPIOThreadPool->push([this, sock](int id) { startUDPIOLoop(sock); });
     // }
     udpBossThread = std::thread(&NetworkServer::startUDPIOLoop, this, sock);
@@ -197,11 +186,12 @@ void NetworkServer::registerPeer(const std::string &peer)
     } // TODO: else
 }
 
-void NetworkServer::probeFinish(const std::string& peer) 
+void NetworkServer::probeFinish(const std::string &peer)
 {
     std::scoped_lock _(mutex);
     auto it = mPeerRTPMap.find(peer);
-    if (it == mPeerRTPMap.end()) {
+    if (it == mPeerRTPMap.end())
+    {
         LOG(WARNING) << "peer " << peer << " not registered";
         return;
     }
@@ -238,7 +228,6 @@ void NetworkServer::readData(const std::string &peer, const size_t &limit, unsig
     size_t queueSize = 0;
     while (!it->second->isProbeFinish && queueSize < 1)
     {
-        LOG(INFO) << "sleeppppppppppppppppppp";
         {
             std::scoped_lock rtpLoak(it->second->mutex);
             queueSize = it->second->packetCacheQueue.size();
@@ -246,23 +235,14 @@ void NetworkServer::readData(const std::string &peer, const size_t &limit, unsig
         little_sleep(std::chrono::microseconds(1000));
         // usleep(10000);
     }
-    // LOG(INFO) << "data size: " << it->second->packetCacheQueue.size();
-    // LOG_EVERY_N(INFO, 1) << "currentSeq vs increasingSeq "
-    //                      << it->second->currentSeq
-    //                      << " vs "
-    //                      << it->second->packetCacheQueue.top().pPacket->increasingSeq
-    //                      << " queue size(): " << it->second->packetCacheQueue.size();
-    // NetworkServer::RAIIRTPPacket packet = it->second->packetCacheQueue.top();
 
     {
         std::scoped_lock rtpLoak(it->second->mutex);
-        while ((!it->second->packetCacheQueue.empty()) && (len < limit - 1500)
-        // &&                          // TODO: max len
-            //    (it->second->packetCacheQueue.top().pPacket->increasingSeq - it->second->currentSeq <= 1 || // 没有间隔
-            //     it->second->packetCacheQueue.top().pPacket->increasingSeq - it->second->currentSeq >       // 超过最大容差限制
-            //         NetworkServer::RTPData::tolerant ||
-            //     (it->second->packetCacheQueue.size() > 20))
-                )
+        while ((!it->second->packetCacheQueue.empty()) && (len < limit - 1500) &&                          // TODO: max len
+               (it->second->packetCacheQueue.top().pPacket->increasingSeq - it->second->currentSeq <= 1 || // 没有间隔
+                it->second->packetCacheQueue.top().pPacket->increasingSeq - it->second->currentSeq >       // 超过最大容差限制
+                    NetworkServer::RTPData::tolerant ||
+                (it->second->packetCacheQueue.size() > 20)))
         {
             std::copy(&it->second->packetCacheQueue.top().pPacket->buf[it->second->packetCacheQueue.top().pPacket->dataIdx],
                       &it->second->packetCacheQueue.top().pPacket->buf[it->second->packetCacheQueue.top().pPacket->dataIdx +
@@ -271,7 +251,6 @@ void NetworkServer::readData(const std::string &peer, const size_t &limit, unsig
             len += it->second->packetCacheQueue.top().pPacket->dataLen;
             it->second->currentSeq = it->second->packetCacheQueue.top().pPacket->increasingSeq;
             it->second->packetCacheQueue.pop();
-            // packet = it->second->packetCacheQueue.top();
         }
     }
 }

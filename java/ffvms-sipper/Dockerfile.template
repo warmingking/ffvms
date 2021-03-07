@@ -1,4 +1,0 @@
-FROM adoptopenjdk/openjdk11:jdk-11.0.7_10-ubi-slim
-WORKDIR /sipper
-COPY build/libs/* /sipper/
-CMD ["java", "-jar", "##sipperJar##", "/sipper/configs/sipper-config.yml"]
