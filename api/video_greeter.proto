@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+package ffvms;
+
+service VideoGreeter {
+    rpc InviteVideo (InviteVideoRequest) returns (InviteVideoResponse) {}
+    rpc SendAck(SendAckRequest) returns (SendAckResponse) {}
+    rpc TearDown(TearDownRequest) returns (TearDownResponse) {}
+}
+
+message InviteVideoRequest {
+    message GBInviteRequest {
+        string cameraId = 1;
+        string receiveInfo = 2;
+        uint64 startTime = 3;
+        uint64 endTime = 4;
+        enum Transmission {
+            TCP = 0;
+            UDP = 1;
+        }
+        Transmission transmission = 5;
+    }
+
+    oneof inviteRequest {
+        GBInviteRequest gbInviteRequest = 1;
+    }
+}
+
+message InviteVideoResponse {
+    string inviteId = 1;
+
+    message GBInviteVideoResponse {
+        string peerInfo = 1;
+        uint32 frequency = 2;
+        uint32 payload = 3;
+        string encoding = 4;
+    }
+
+    oneof inviteResponse {
+        GBInviteVideoResponse gbInviteResponse = 100;
+    }
+}
+
+message SendAckRequest {
+    string inviteId = 1;
+}
+
+message SendAckResponse {
+}
+
+message TearDownRequest {
+    string inviteId = 1;
+}
+
+message TearDownResponse {
+}

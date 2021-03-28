@@ -1,0 +1,19 @@
+{
+    "network_server": {
+        "event_thread_num": 1,
+        "port": 8086
+    },
+    "rtp_producer": {
+        "file_event_thread_num": -1,
+        "max_bandwidth_in_mb": 4,
+        "network_receive_host": "127.0.0.1:8086",
+        "rtp_jitter_in_ms": 2000,
+        "sipper_host": "127.0.0.1:8899",
+        "rpc_timeout_in_ms": 0
+    },
+    "rtsp_service": {
+        "event_thread_num": -1,
+        "rtsp_port": 8554,
+        "keep_alive_in_sec": 0
+    }
+}

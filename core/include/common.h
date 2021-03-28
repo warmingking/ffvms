@@ -9,6 +9,8 @@
 #pragma diag_suppress 144
 #endif
 
+#define FFVMS_SUCC std::error_code{}
+
 void funcTrace();
 
 enum StreamingMode
@@ -46,6 +48,9 @@ public:
     StreamingMode gbStreamingMode;
 
     VideoRequest();
+    VideoRequest(const VideoRequest &other) = default;
+    VideoRequest& operator=(const VideoRequest &other) = default;
+    VideoRequest(std::string&& url);
     ~VideoRequest();
 
     static VideoRequest parseUrl(const std::string &url);

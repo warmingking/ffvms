@@ -13,6 +13,11 @@ std::ostream &operator<<(std::ostream &os, const VideoRequest &request)
 VideoRequest::VideoRequest()
     : _use_file(false), filename(""), repeatedly(false), _use_gb(false), gbid(""), gbStreamingMode(StreamingMode::UDP) {}
 
+VideoRequest::VideoRequest(std::string &&url)
+{
+    *this = VideoRequest::parseUrl(url);
+}
+
 VideoRequest::~VideoRequest() {}
 
 VideoRequest VideoRequest::parseUrl(const std::string &url)

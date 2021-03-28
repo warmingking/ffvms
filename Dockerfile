@@ -1,6 +1,6 @@
-FROM ubuntu
+FROM ubuntu as base
 
-# set 
+# set
 ARG DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Shanghai
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
@@ -60,34 +60,52 @@ RUN git clone -b ${CTPL_TAG} https://github.com/vit-vit/CTPL ${CTPL_DIR} && \
     mkdir /usr/local/include/ctpl && \
     cp ${CTPL_DIR}/*.h /usr/local/include/ctpl
 
-ARG CPPCORO_TAG=master
-ARG CPPCORO_DIR=/var/local/git/cppcoro
-RUN apt-get install -y python2.7 clang lld libc++-dev libc++abi-dev && \
-    git clone -b ${CPPCORO_TAG} https://github.com/andreasbuhr/cppcoro.git ${CPPCORO_DIR} && \
-    cd ${CPPCORO_DIR} && \
-    git submodule update --init --recursive && \
-    mkdir build && cd build && \
-    export CXX=clang++ && \
-    export CXXFLAGS="-stdlib=libc++ -march=native" && \
-    export LDFLAGS="-stdlib=libc++ -fuse-ld=lld -Wl,--gdb-index" && \
-    cmake .. -DCMAKE_BUILD_TYPE=Release && \
-    make && make install
-
 ARG MEDIA_SERVER_TAG=master
 ARG MEDIA_SERVER_DIR=/var/local/git/media-server
-RUN git clone -b ${MEDIA_SERVER_TAG} https://github.com/ireader/sdk ${MEDIA_SERVER_DIR}/sdk && \
+ARG MEDIA_SERVER_INSTALL_DIR=/usr/local/include/media_server
+RUN apt-get install -y bc && \
+    git clone -b ${MEDIA_SERVER_TAG} https://github.com/ireader/sdk ${MEDIA_SERVER_DIR}/sdk && \
+    git clone -b ${MEDIA_SERVER_TAG} https://github.com/ireader/avcodec ${MEDIA_SERVER_DIR}/avcodec && \
     git clone -b ${MEDIA_SERVER_TAG} https://github.com/ireader/media-server ${MEDIA_SERVER_DIR}/media-server && \
+    mkdir ${MEDIA_SERVER_INSTALL_DIR} && \
+    cd ${MEDIA_SERVER_DIR}/avcodec && make clean && make -j4 RELEASE=1 && \
+    for LIB in $(ls -d */ | awk -F '/' '{print $1}'); do cp -r $LIB/include ${MEDIA_SERVER_INSTALL_DIR}/$LIB ; cp $LIB/release.linux/$LIB.a /usr/local/lib | true ; done && \
     cd ${MEDIA_SERVER_DIR}/media-server && \
-    make clean && make RELEASE=1 && \
-    mkdir /usr/local/include/meida_server && \
-    for LIB in $(ls -d lib*); do cp -r $LIB/include /usr/local/include/meida_server/$LIB ; cp $LIB/release.linux/$LIB.a /usr/local/lib ; done && \
-    cd ../sdk && make clean && make RELEASE=1 && \
-    for LIB in $(ls -d lib*); do cp -r $LIB/include /usr/local/include/meida_server/$LIB ; cp $LIB/release.linux/$LIB.a /usr/local/lib ; done
+    make clean && make -j4 RELEASE=1 && \
+    for LIB in $(ls -d lib*); do cp -r $LIB/include ${MEDIA_SERVER_INSTALL_DIR}/$LIB ; cp $LIB/release.linux/$LIB.a /usr/local/lib ; done && \
+    cd ../sdk && make clean && make -j4 RELEASE=1 && cp -r include/* ${MEDIA_SERVER_INSTALL_DIR} && \
+    for LIB in $(ls -d lib*); do cp -r $LIB/include ${MEDIA_SERVER_INSTALL_DIR}/$LIB ; cp $LIB/release.linux/$LIB.a /usr/local/lib ; done
+
+ARG FMT_TAG=master
+ARG FMT_DIR=/var/local/git/fmt
+RUN git clone -b ${FMT_TAG} https://github.com/fmtlib/fmt.git ${FMT_DIR} && \
+    cd ${FMT_DIR} && \
+    mkdir build && cd build && cmake .. -DFMT_DOC=OFF -DFMT_TEST=OFF && \
+    make -j4 && make install
+
+ARG JSON_TAG=v3.9.1
+ARG JSON_DIR=/var/local/git/json
+RUN git clone -b ${JSON_TAG} https://github.com/nlohmann/json.git ${JSON_DIR} && \
+    cd ${JSON_DIR} && \
+    mkdir build && cd build && \
+    cmake .. && make -j4 && make install
 
 RUN apt-get autoremove -y
 
 # for convenience
-RUN apt-get install -y sudo zsh zsh-antigen && apt-get autoremove -y
+FROM base AS dev
+ENV HTTP_PROXY="http://127.0.0.1:7890"
+ENV HTTPS_PROXY="http://127.0.0.1:7890"
+
+RUN apt-get update && \
+    apt-get install -y sudo gdb lsof net-tools netcat zsh zsh-antigen ffmpeg linux-tools-5.4.0-70-generic wget unzip && \
+    apt-get autoremove -y
+
+RUN wget -q https://github.com/brendangregg/FlameGraph/archive/master.zip && \
+    unzip master.zip && \
+    mv FlameGraph-master/ /opt/FlameGraph
+
+ENV PATH="/opt/FlameGraph:${PATH}"
 
 ARG USER=icefe
 ARG UID=1000

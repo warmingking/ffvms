@@ -3,18 +3,9 @@ project(ffvms)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_package(gRPC QUIET)
-find_package(Protobuf QUIET)
-find_library(HTTP_PARSER_LIB libhttp_parser.a) # for libraries not managed by cmake, we prefer static library
-find_program(PROTOC_EXECUTABLE protoc)
-find_program(GRPC_CPP_PLUGIN grpc_cpp_plugin)
-
-set(_PROTOBUF_LIBPROTOBUF protobuf::libprotobuf)
-set(_REFLECTION gRPC::grpc++_reflection)
-
-function(PROTOBUF_GENERATE_GRPC_CPP SRCS HDRS GENERATED_DIR)
+function(protobuf_generate_grpc_cpp SRCS HDRS GENERATED_DIR)
   if(NOT ARGN)
-    message(SEND_ERROR "Error: PROTOBUF_GENERATE_GRPC_CPP() called without any proto files")
+    message(SEND_ERROR "Error: protobuf_generate_grpc_cpp called without any proto files")
     return()
   endif()
 
@@ -76,32 +67,7 @@ function(PROTOBUF_GENERATE_GRPC_CPP SRCS HDRS GENERATED_DIR)
   include_directories(${GENERATED_DIR})
 endfunction()
 
-PROTOBUF_GENERATE_GRPC_CPP(GRPC_VIDEO_GREETER_SRCS
-                           GRPC_VIDEO_GREETER_HDRS
-                           "${CMAKE_CURRENT_BINARY_DIR}/gens"
-                           "${CMAKE_CURRENT_SOURCE_DIR}/video_greeter.proto")
-
-add_executable(ffvms
-    ffvms.cpp
-    rtsp_server.cpp
-    video_manager_service.cpp
-    network_server.cpp
-    rtsp_parser.cpp
-    common.cpp
-    ${GRPC_VIDEO_GREETER_SRCS})
-
-# target_include_directories(ffvms PRIVATE ${GRPC_VIDEO_GREETER_HDRS})
-
-target_link_libraries(ffvms
-    gflags
-    glog
-    event_core
-    event_pthreads
-    avformat
-    avcodec
-    avutil
-    ${HTTP_PARSER_LIB}
-    ${_REFLECTION}
-    ${_PROTOBUF_LIBPROTOBUF})
-
-set_property(TARGET ffvms PROPERTY CXX_STANDARD 17)
+add_subdirectory(common)
+add_subdirectory(api)
+add_subdirectory(core)
+add_subdirectory(tools)
