@@ -15,7 +15,8 @@ using namespace ::testing;
 DEFINE_int32(push_local_port, 12300, "push rtp local port begin with");
 DEFINE_int32(video_greeter_port, 8899, "video greeter server port");
 DEFINE_int32(network_port, 8086, "udp receive port");
-DEFINE_int32(network_event_thread_num, 1, "network event thread number");
+DEFINE_int32(network_event_loop_num, 1, "network event loop number");
+DEFINE_int32(network_async_worker_num, 1, "network async worker number");
 DEFINE_int32(file_event_thread_num, 1, "file event thread number");
 DEFINE_int32(rtp_jitter_in_ms, 200, "rtp jitter in ms");
 DEFINE_int32(max_bandwidth_in_mb, 4, "max bandwidth in MB");
@@ -151,9 +152,10 @@ private:
 
         NetworkServer::Config network_config;
         network_config.port = FLAGS_network_port;
-        network_config.event_thread_num = FLAGS_network_event_thread_num;
+        network_config.event_loop_num = FLAGS_network_event_loop_num;
+        network_config.async_worker_num = FLAGS_network_async_worker_num;
         pNetworkServer = std::make_shared<NetworkServer>();
-        pNetworkServer->initUDPServer(network_config);
+        pNetworkServer->initUdpServer(network_config);
 
         RtpProducer::Config rtp_producer_config;
         rtp_producer_config.file_event_thread_num = FLAGS_file_event_thread_num;

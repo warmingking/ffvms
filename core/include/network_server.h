@@ -1,7 +1,7 @@
 #ifndef __NETWORK_SERVER_H__
 #define __NETWORK_SERVER_H__
 
-#include <ctpl/ctpl_stl.h>
+#include <ctpl/ctpl.h>
 #include <event2/event.h>
 #include <functional>
 #include <map>
@@ -24,16 +24,18 @@ public:
     struct Config
     {
         int port;
-        int event_thread_num;
+        int event_loop_num;
+        int async_worker_num;
 
-        NLOHMANN_DEFINE_TYPE_INTRUSIVE(Config, port, event_thread_num)
+        NLOHMANN_DEFINE_TYPE_INTRUSIVE(Config, port, event_loop_num,
+                                       async_worker_num)
     };
 
 public:
     NetworkServer();
     virtual ~NetworkServer();
 
-    void initUDPServer(Config config);
+    void initUdpServer(Config config);
     void registerPeer(const std::string &peer,
                       ProcessDataFunction &&processDataFunc);
     void unRegisterPeer(const std::string &peer);
@@ -46,22 +48,35 @@ private:
         Opaque(ProcessDataFunction &&processFunc) : processFunc(processFunc) {}
     };
 
+    struct UdpEventLoop
+    {
+        int socket;
+        std::unique_ptr<struct event_base,
+                        std::function<void(struct event_base *)>>
+            pUdpBase;
+        std::unique_ptr<struct event, std::function<void(struct event *)>>
+            pUdpEvent;
+        std::thread udpEventLoopThread;
+
+        UdpEventLoop() = default;
+        ~UdpEventLoop();
+
+        void Init(void* server, int port);
+        void Run();
+    };
+
 private:
-    std::unique_ptr<int> mpSocket;
-    std::unique_ptr<struct event_base, std::function<void(struct event_base *)>>
-        mpUDPBase;
-    std::unique_ptr<struct event, std::function<void(struct event *)>>
-        mpUDPEvent;
-    std::thread udpBossThread;
-    std::vector<std::unique_ptr<ctpl::thread_pool>> mpUDPIOThreadPools;
-    // size == 2, UDP 的收流 buffer, 交替使用
+    std::vector<std::unique_ptr<UdpEventLoop>> mpUdpWorkers;
+    std::vector<std::unique_ptr<ctpl::thread_pool>> mpUdpWorkerThreads;
+    // size == 2, udp 的收流 buffer, 交替使用
+    std::mutex mBufferMutex;
     std::vector<std::unique_ptr<char[]>> mpReceiveBuffers;
     int mBufferSize;
     int mReceiveBufferIndex; // 0 or 1
     int mCurPosition;        // current position in receive buffer
-    std::shared_mutex mutex;
+    std::shared_mutex mMutex;
     std::map<std::string, std::unique_ptr<Opaque>> mRegisteredPeer;
-    void startUDPIOLoop();
+    void startUdpEventLoop(void* server, int port);
 };
 } // namespace core
 } // namespace ffvms

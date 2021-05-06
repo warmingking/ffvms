@@ -9,7 +9,8 @@ using namespace testing;
 
 DEFINE_int32(port, 8086, "udp receive port");
 DEFINE_int32(send_port, 12345, "port to send data");
-DEFINE_int32(event_thread_num, 1, "event thread number");
+DEFINE_int32(event_loop_num, 1, "event loop number");
+DEFINE_int32(async_worker_num, 1, "async worker number");
 
 class NetworkServerTest : public Test
 {
@@ -21,9 +22,10 @@ private:
     {
         NetworkServer::Config config;
         config.port = FLAGS_port;
-        config.event_thread_num = FLAGS_event_thread_num;
+        config.event_loop_num = FLAGS_event_loop_num;
+        config.async_worker_num = FLAGS_async_worker_num;
         pServer = std::make_unique<NetworkServer>();
-        pServer->initUDPServer(config);
+        pServer->initUdpServer(config);
     }
 
     void TearDown() override {}
