@@ -24,6 +24,10 @@ NetworkServer::~NetworkServer()
     {
         event_base_loopbreak(mpUDPBase.get());
     }
+    if (mpUDPEventThreadPool)
+    {
+        mpUDPEventThreadPool->stop();
+    }
     for (int i = 0; i < mpUDPIOThreadPools.size(); i++)
     {
         mpUDPIOThreadPools[i]->stop();
@@ -61,6 +65,7 @@ void NetworkServer::startUDPIOLoop()
                     }
 
                     NetworkServer *server = (NetworkServer *)arg;
+
                     if (server->mCurPosition + 1600 >= server->mBufferSize)
                     {
                         server->mReceiveBufferIndex ^= 1;
@@ -87,48 +92,59 @@ void NetworkServer::startUDPIOLoop()
                     }
                     server->mCurPosition += len;
 
-                    std::string peer =
-                        fmt::format("{}:{}", inet_ntoa(server_sin.sin_addr),
-                                    htons(server_sin.sin_port));
+                    server->mpUDPEventThreadPool->push([=](int threadId) {
+                        std::string peer =
+                            fmt::format("{}:{}", inet_ntoa(server_sin.sin_addr),
+                                        htons(server_sin.sin_port));
 
-                    uint8_t *udata = (uint8_t *)data;
-                    LOG(INFO) << "data from: " << peer
-                              << ", seq: " << (udata[2] << 8 | udata[3])
-                              << ", len: " << len;
-                    if (peer == "127.0.0.1:12300")
-                    {
-                        // LOG(INFO) << "seq: " << (udata[3] << 8 | udata[4])
-                        //           << ", len: " << len;
-                        // LOG_EVERY_N(INFO, 1000)
-                        //     << "dump peer " << peer << " to file
-                        //     tbut_in.rtp";
-                        // std::ofstream file("/workspaces/ffvms/tbut_in.rtp",
-                        //                    std::ios::binary | std::ios::app);
-                        // // 先用 2 位保存 rtp 包的长度, 然后保存 rtp 包
-                        // char lenHeader[2] = {0, 0};
-                        // lenHeader[0] = len >> 8;
-                        // lenHeader[1] = len & 0xFF;
-                        // file.write(lenHeader, 2);
-                        // file.write((const char *)data, len);
-                    }
+                        uint8_t *udata = (uint8_t *)data;
+                        LOG_EVERY_N(INFO, 1000) << "[" << threadId << "] data from: " << peer
+                                  << ", seq: " << (udata[2] << 8 | udata[3])
+                                  << ", len: " << len;
+                        /*
+                        if (peer == "127.0.0.1:12300")
+                        {
+                            LOG(INFO) << "[" << threadId << "] data from: " <<
+                        peer
+                                      << ", seq: " << (udata[2] << 8 | udata[3])
+                                      << ", len: " << len;
+                            LOG(INFO) << "seq: " << (udata[3] << 8 |
+                            udata[4])
+                                      << ", len: " << len;
+                            LOG_EVERY_N(INFO, 1000)
+                                << "dump peer " << peer << " to file
+                                tbut_in.rtp";
+                            std::ofstream
+                            file("/workspaces/ffvms/tbut_in.rtp",
+                                               std::ios::binary |
+                                               std::ios::app);
+                            // 先用 2 位保存 rtp 包的长度, 然后保存 rtp 包
+                            char lenHeader[2] = {0, 0};
+                            lenHeader[0] = len >> 8;
+                            lenHeader[1] = len & 0xFF;
+                            file.write(lenHeader, 2);
+                            file.write((const char *)data, len);
+                        }
+                        */
 
-                    size_t idx = std::hash<std::string>{}(peer) %
-                                 server->mpUDPIOThreadPools.size();
-                    server->mpUDPIOThreadPools[idx]->push(
-                        [server, data, len, peer](int id) {
-                            VLOG(2) << "new task in thread id " << id;
-                            auto &buffer = server->mpReceiveBuffers[id];
+                        size_t idx = std::hash<std::string>{}(peer) %
+                                     server->mpUDPIOThreadPools.size();
+                        server->mpUDPIOThreadPools[idx]->push(
+                            [server, data, len, peer](int id) {
+                                VLOG(2) << "new task in thread id " << id;
+                                auto &buffer = server->mpReceiveBuffers[id];
 
-                            std::shared_lock _(server->mutex);
-                            auto it = server->mRegisteredPeer.find(peer);
-                            if (it == server->mRegisteredPeer.end())
-                            {
-                                LOG(WARNING)
-                                    << "peer " << peer << " not registered";
-                                return;
-                            }
-                            it->second->processFunc(data, len);
-                        });
+                                std::shared_lock _(server->mutex);
+                                auto it = server->mRegisteredPeer.find(peer);
+                                if (it == server->mRegisteredPeer.end())
+                                {
+                                    LOG(WARNING)
+                                        << "peer " << peer << " not registered";
+                                    return;
+                                }
+                                it->second->processFunc(data, len);
+                            });
+                    });
                 },
                 this),
             [](event *e) { event_free(e); });
@@ -154,6 +170,11 @@ void NetworkServer::initUDPServer(Config config)
     }
     mReceiveBufferIndex = 0;
 
+    int workThreadNum = config.work_thread_num == -1
+                            ? std::thread::hardware_concurrency()
+                            : config.work_thread_num;
+    mpUDPEventThreadPool = std::make_unique<ctpl::thread_pool>(workThreadNum);
+
     mpSocket = std::make_unique<int>();
     *mpSocket = socket(AF_INET, SOCK_DGRAM, 0);
     fcntl(*mpSocket, F_SETFL, O_NONBLOCK);
@@ -162,6 +183,13 @@ void NetworkServer::initUDPServer(Config config)
     sin.sin_family = AF_INET;
     sin.sin_addr.s_addr = INADDR_ANY;
     sin.sin_port = htons(config.port);
+
+    int udp_recv_buf = 1024 * 1024 * 10;
+    if (setsockopt(*mpSocket, SOL_SOCKET, SO_RCVBUF, &udp_recv_buf,
+                   sizeof(udp_recv_buf)) < 0)
+    {
+        LOG(FATAL) << "Error setsockopt rcvbuf -> " << strerror(errno);
+    }
 
     if (bind(*mpSocket, (struct sockaddr *)&sin, sizeof(sin)))
     {

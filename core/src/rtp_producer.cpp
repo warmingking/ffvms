@@ -32,12 +32,13 @@ struct rtp_payload_t RtpProducer::RtpVideoContext::RtpPayloadFunc
                 << "on packet length " << bytes << ", send to rtsp server";
             RtpVideoContext *context = static_cast<RtpVideoContext *>(param);
 
+            /*
             if (context->videoRequest.gbid == "1234")
             {
                 LOG_EVERY_N(INFO, 1000)
                     << "dump " << context->videoRequest << " to file tbut.rtp";
                 std::ofstream file("/workspaces/ffvms/tbut.rtp",
-                                   std::ios::binary | std::ios::app);
+            std::ios::binary | std::ios::app);
                 // 先用 2 位保存 rtp 包的长度, 然后保存 rtp 包
                 char len[2] = {0, 0};
                 len[0] = bytes >> 8;
@@ -45,7 +46,7 @@ struct rtp_payload_t RtpProducer::RtpVideoContext::RtpPayloadFunc
                 file.write(len, 2);
                 file.write((const char *)packet, bytes);
             }
-
+            */
             context->consumePktFunc((const char *)packet, bytes);
             return rtp_onsend(context->rtp.get(), packet, bytes);
         }
@@ -718,24 +719,29 @@ void RtpProducer::RegisterVideo(VideoRequest video,
                                 VLOG_EVERY_N(1, 10)
                                     << "video " << video
                                     << " get packet, size : " << len;
-
-                                // if (it->second->videoRequest.gbid == "1234")
-                                // {
-                                //     LOG_EVERY_N(INFO, 1000)
-                                //         << "dump " << it->second->videoRequest
-                                //         << " to file tbut_in.rtp";
-                                //     std::ofstream file(
-                                //         "/workspaces/ffvms/tbut_in.rtp",
-                                //         std::ios::binary | std::ios::app);
-                                //     // 先用 2 位保存 rtp 包的长度, 然后保存 rtp
-                                //     // 包
-                                //     char lenHeader[2] = {0, 0};
-                                //     lenHeader[0] = len >> 8;
-                                //     lenHeader[1] = len & 0xFF;
-                                //     file.write(lenHeader, 2);
-                                //     file.write(data, len);
-                                // }
-
+                                /*
+                                                                if
+                                   (it->second->videoRequest.gbid == "1234")
+                                                                {
+                                                                    LOG_EVERY_N(INFO,
+                                   1000)
+                                                                        << "dump
+                                   " << it->second->videoRequest
+                                                                        << " to
+                                   file tbut_in.rtp"; std::ofstream file(
+                                                                        "/workspaces/ffvms/tbut_in.rtp",
+                                                                        std::ios::binary
+                                   | std::ios::app);
+                                                                    // 先用 2
+                                   位保存 rtp 包的长度, 然后保存 rtp
+                                                                    // 包
+                                                                    char
+                                   lenHeader[2] = {0, 0}; lenHeader[0] = len >>
+                                   8; lenHeader[1] = len & 0xFF;
+                                                                    file.write(lenHeader,
+                                   2); file.write(data, len);
+                                                                }
+                                */
                                 rtp_demuxer_input(it->second->demuxer.get(),
                                                   data, len);
                             });

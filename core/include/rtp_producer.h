@@ -4,7 +4,7 @@
 #include "async_client.h"
 #include "network_server.h"
 #include "video_greeter.grpc.pb.h"
-#include <ctpl/ctpl_stl.h>
+#include <ctpl/ctpl.h>
 #include <event2/event.h>
 #include <functional>
 #include <map>

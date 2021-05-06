@@ -1,7 +1,7 @@
 #ifndef __NETWORK_SERVER_H__
 #define __NETWORK_SERVER_H__
 
-#include <ctpl/ctpl_stl.h>
+#include <ctpl/ctpl.h>
 #include <event2/event.h>
 #include <functional>
 #include <map>
@@ -25,8 +25,9 @@ public:
     {
         int port;
         int event_thread_num;
+        int work_thread_num;
 
-        NLOHMANN_DEFINE_TYPE_INTRUSIVE(Config, port, event_thread_num)
+        NLOHMANN_DEFINE_TYPE_INTRUSIVE(Config, port, event_thread_num, work_thread_num)
     };
 
 public:
@@ -53,6 +54,7 @@ private:
     std::unique_ptr<struct event, std::function<void(struct event *)>>
         mpUDPEvent;
     std::thread udpBossThread;
+    std::unique_ptr<ctpl::thread_pool> mpUDPEventThreadPool;
     std::vector<std::unique_ptr<ctpl::thread_pool>> mpUDPIOThreadPools;
     // size == 2, UDP 的收流 buffer, 交替使用
     std::vector<std::unique_ptr<char[]>> mpReceiveBuffers;

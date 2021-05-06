@@ -1,6 +1,7 @@
 {
     "network_server": {
-        "event_thread_num": 1,
+        "event_thread_num": -1,
+        "work_thread_num": -1,
         "port": 8086
     },
     "rtp_producer": {
