@@ -23,7 +23,7 @@ private:
         config.port = FLAGS_port;
         config.event_thread_num = FLAGS_event_thread_num;
         pServer = std::make_unique<NetworkServer>();
-        pServer->initUDPServer(config);
+        pServer->initUdpServer(config);
     }
 
     void TearDown() override {}

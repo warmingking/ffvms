@@ -153,7 +153,7 @@ private:
         network_config.port = FLAGS_network_port;
         network_config.event_thread_num = FLAGS_network_event_thread_num;
         pNetworkServer = std::make_shared<NetworkServer>();
-        pNetworkServer->initUDPServer(network_config);
+        pNetworkServer->initUdpServer(network_config);
 
         RtpProducer::Config rtp_producer_config;
         rtp_producer_config.file_event_thread_num = FLAGS_file_event_thread_num;

@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
 
     std::shared_ptr<NetworkServer> networkServer =
         std::make_shared<NetworkServer>();
-    networkServer->initUDPServer(config["network_server"]);
+    networkServer->initUdpServer(config["network_server"]);
 
     std::shared_ptr<RtpProducer> rtpProducer = std::make_shared<RtpProducer>();
     rtpProducer->Init(config["rtp_producer"], networkServer);
