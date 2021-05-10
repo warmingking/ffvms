@@ -73,7 +73,7 @@ public:
         response->set_inviteid(inviteId);
         auto *gbInviteRequest = response->mutable_gbinviteresponse();
         gbInviteRequest->set_peerinfo(
-            fmt::format("127.0.0.1:{}", mPushSessions[inviteId].pushPort));
+            fmt::format("localhost:{}", mPushSessions[inviteId].pushPort));
         gbInviteRequest->set_frequency(90000);
         gbInviteRequest->set_payload(33);
         gbInviteRequest->set_encoding("MP2T");

@@ -68,6 +68,7 @@ void NetworkServer::UdpWorker::Init(void *server, int port)
 
                     if (server->mCurPosition + 1600 >= server->mBufferSize)
                     {
+                        LOG(INFO) << "==================";
                         server->mReceiveBufferIndex ^= 1;
                         server->mCurPosition = 0;
                     }
@@ -75,8 +76,12 @@ void NetworkServer::UdpWorker::Init(void *server, int port)
                         &server->mpReceiveBuffers[server->mReceiveBufferIndex]
                                                  [server->mCurPosition];
 
-                    struct sockaddr_in server_sin;
-                    socklen_t server_size = sizeof(server_sin);
+                    // struct sockaddr_in server_sin;
+                    // socklen_t server_size = sizeof(server_sin);
+                    // memset(&server_sin, 0, sizeof(server_sin));
+
+                    struct sockaddr_storage server_sin;
+                    socklen_t server_size = sizeof(struct sockaddr_storage);
 
                     /* Recv the data, store the address of the sender in
                      * server_sin
@@ -84,6 +89,7 @@ void NetworkServer::UdpWorker::Init(void *server, int port)
                     int len =
                         recvfrom(sock, data, 1600, 0,
                                  (struct sockaddr *)&server_sin, &server_size);
+
                     if (len == -1)
                     {
                         LOG_IF(ERROR, errno != EAGAIN)
@@ -92,25 +98,52 @@ void NetworkServer::UdpWorker::Init(void *server, int port)
                     }
                     server->mCurPosition += len;
 
-                    std::string peer =
-                        fmt::format("{}:{}", inet_ntoa(server_sin.sin_addr),
-                                    htons(server_sin.sin_port));
+                    char host[NI_MAXHOST], service[NI_MAXSERV];
+                    int s = getnameinfo((struct sockaddr *)&server_sin,
+                                        server_size, host, NI_MAXHOST,
+                                        service, NI_MAXSERV, NI_NUMERICSERV);
+                    std::string peer = fmt::format("{}:{}", host, service);
+
+                    // std::string peer =
+                    //     fmt::format("{}:{}", inet_ntoa(server_sin.sin_addr),
+                    //                 htons(server_sin.sin_port));
 
                     uint8_t *udata = (uint8_t *)data;
-                    if (peer == "127.0.0.1:12300")
+                    if (peer == "localhost:12300")
                     {
-                        LOG_EVERY_N(INFO, 1) << "seq: " << (udata[2] << 8 | udata[3])
-                                  << ", len: " << len;
-                        LOG_EVERY_N(INFO, 1000)
-                            << "dump peer " << peer << " to file tbut_in.rtp ";
-                        std::ofstream file("/workspaces/ffvms/tbut_in.rtp",
-                                           std::ios::binary | std::ios::app);
-                        // 先用 2 位保存 rtp 包的长度, 然后保存 rtp 包
-                        char lenHeader[2] = {0, 0};
-                        lenHeader[0] = len >> 8;
-                        lenHeader[1] = len & 0xFF;
-                        file.write(lenHeader, 2);
-                        file.write((const char *)data, len);
+                        LOG_EVERY_N(INFO, 1)
+                            << "seq: " << (udata[2] << 8 | udata[3])
+                            << ", len: " << len << ", data: "
+                            << fmt::format("{0:#x}",
+                                           uint32_t(udata[0] << 24 |
+                                                    udata[1] << 16 |
+                                                    udata[2] << 8 | udata[3]))
+                            << " "
+                            << fmt::format("{0:#x}",
+                                           uint32_t(udata[4] << 24 |
+                                                    udata[5] << 16 |
+                                                    udata[6] << 8 | udata[7]))
+                            << " "
+                            << fmt::format("{0:#x}",
+                                           uint32_t(udata[8] << 24 |
+                                                    udata[9] << 16 |
+                                                    udata[10] << 8 | udata[11]))
+                            << " "
+                            << fmt::format(
+                                   "{0:#x}",
+                                   uint32_t(udata[12] << 24 | udata[13] << 16 |
+                                            udata[14] << 8 | udata[15]));
+                        // LOG_EVERY_N(INFO, 1000)
+                        //     << "dump peer " << peer << " to file tbut_in.rtp
+                        //     ";
+                        // std::ofstream file("/workspaces/ffvms/tbut_in.rtp",
+                        //                    std::ios::binary | std::ios::app);
+                        // // 先用 2 位保存 rtp 包的长度, 然后保存 rtp 包
+                        // char lenHeader[2] = {0, 0};
+                        // lenHeader[0] = len >> 8;
+                        // lenHeader[1] = len & 0xFF;
+                        // file.write(lenHeader, 2);
+                        // file.write((const char *)data, len);
                     }
 
                     size_t idx = std::hash<std::string>{}(peer) %
@@ -120,7 +153,7 @@ void NetworkServer::UdpWorker::Init(void *server, int port)
                             VLOG(2) << "new task in thread id " << id;
                             auto &buffer = server->mpReceiveBuffers[id];
 
-                            std::shared_lock _(server->mutex);
+                            std::shared_lock _(server->mMutex);
                             auto it = server->mRegisteredPeer.find(peer);
                             if (it == server->mRegisteredPeer.end())
                             {
@@ -206,7 +239,7 @@ void NetworkServer::initUdpServer(Config config)
 void NetworkServer::registerPeer(const std::string &peer,
                                  ProcessDataFunction &&processDataFunc)
 {
-    std::unique_lock _(mutex);
+    std::unique_lock _(mMutex);
     if (mRegisteredPeer.count(peer) == 0)
     {
         LOG(INFO) << "register peer " << peer;
@@ -221,6 +254,6 @@ void NetworkServer::registerPeer(const std::string &peer,
 
 void NetworkServer::unRegisterPeer(const std::string &peer)
 {
-    std::unique_lock _(mutex);
+    std::unique_lock _(mMutex);
     mRegisteredPeer.erase(peer);
 }

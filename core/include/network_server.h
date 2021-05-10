@@ -73,7 +73,7 @@ private:
     int mBufferSize;
     int mReceiveBufferIndex; // 0 or 1
     int mCurPosition;        // current position in receive buffer
-    std::shared_mutex mutex;
+    std::shared_mutex mMutex;
     std::map<std::string, std::unique_ptr<Opaque>> mRegisteredPeer;
     void startUdpWorker(void* server, int port);
 };
