@@ -53,19 +53,22 @@ void NetworkServer::UdpWorker::Init(void *server, int port)
         LOG(FATAL) << "failed to create event base " << strerror(errno);
     }
 
-    pUdpEvent =
-        std::unique_ptr<struct event, std::function<void(struct event *)>>(
-            event_new(
-                pUdpBase.get(), socket, EV_READ | EV_PERSIST,
-                [](const int sock, short int which, void *arg) {
-                    if (!which & EV_READ)
-                    {
-                        VLOG(1) << "unknown event " << which << ", do nothing";
-                        return;
-                    }
+    pUdpEvent = std::unique_ptr<struct event,
+                                std::function<void(struct event *)>>(
+        event_new(
+            pUdpBase.get(), socket, EV_READ | EV_PERSIST | EV_ET,
+            [](const int sock, short int which, void *arg) {
+                if (!which & EV_READ)
+                {
+                    VLOG(1) << "unknown event " << which << ", do nothing";
+                    return;
+                }
 
-                    NetworkServer *server = (NetworkServer *)arg;
+                NetworkServer *server = (NetworkServer *)arg;
 
+                int len = -1;
+                while (true)
+                {
                     if (server->mCurPosition + 1600 >= server->mBufferSize)
                     {
                         LOG(INFO) << "==================";
@@ -100,8 +103,8 @@ void NetworkServer::UdpWorker::Init(void *server, int port)
 
                     char host[NI_MAXHOST], service[NI_MAXSERV];
                     int s = getnameinfo((struct sockaddr *)&server_sin,
-                                        server_size, host, NI_MAXHOST,
-                                        service, NI_MAXSERV, NI_NUMERICSERV);
+                                        server_size, host, NI_MAXHOST, service,
+                                        NI_MAXSERV, NI_NUMERICSERV);
                     std::string peer = fmt::format("{}:{}", host, service);
 
                     // std::string peer =
@@ -163,9 +166,10 @@ void NetworkServer::UdpWorker::Init(void *server, int port)
                             }
                             it->second->processFunc(data, len);
                         });
-                },
-                server),
-            [](event *e) { event_free(e); });
+                }
+            },
+            server),
+        [](event *e) { event_free(e); });
     event_add(pUdpEvent.get(), 0);
 }
 
