@@ -1,4 +1,5 @@
 find_library(HTTP_PARSER_LIB http_parser) # for libraries not managed by cmake, we prefer static library
+find_library(PCAP_LIB pcap) # for libraries not managed by cmake, we prefer static library
 find_library(RTP_LIB librtp.a)
 find_library(RTSP_LIB librtsp.a)
 find_library(HTTP_LIB libhttp.a)
@@ -24,6 +25,7 @@ target_link_libraries(ffvms_core
     ${RTP_LIB}
     ${RTSP_LIB}
     ${HTTP_LIB}
+    ${PCAP_LIB}
     grpc_common
     ffvms_api
 )

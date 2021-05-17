@@ -90,6 +90,14 @@ RUN git clone -b ${JSON_TAG} https://github.com/nlohmann/json.git ${JSON_DIR} &&
     mkdir build && cd build && \
     cmake .. && make -j4 && make install
 
+ARG LIBPCAP_TAG=libpcap-1.10
+ARG LIBPCAP_DIR=/var/local/git/libpcap
+RUN apt-get install -y flex bison libnl-genl-3-dev && \
+    git clone -b ${LIBPCAP_TAG} https://github.com/the-tcpdump-group/libpcap ${LIBPCAP_DIR} && \
+    cd ${LIBPCAP_DIR} && \
+    mkdir build && cd build && \
+    cmake .. && make -j4 && make install
+
 RUN apt-get autoremove -y
 
 # for convenience

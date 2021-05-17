@@ -76,6 +76,10 @@ private:
     std::shared_mutex mMutex;
     std::map<std::string, std::unique_ptr<Opaque>> mRegisteredPeer;
     void startUdpWorker(void* server, int port);
+    std::thread mEthThDumpread;
+
+public:
+    inline static std::map<u_char*, void*> mEthThMap;
 };
 } // namespace core
 } // namespace ffvms
