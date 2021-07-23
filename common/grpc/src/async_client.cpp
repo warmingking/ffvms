@@ -17,6 +17,9 @@ AsyncClient::AsyncClient(int threadNum) : mThreadNum(threadNum)
     for (int i = 0; i < threadNum; i++)
     {
         mpCqs.emplace_back(std::make_unique<CompletionQueue>());
+    }
+    for (int i = 0; i < threadNum; i++)
+    {
         mThreads.emplace_back(std::thread(
             [this](int idx) {
                 void *got_tag;
