@@ -5,7 +5,7 @@
 
 using namespace ffvms::core;
 using namespace google;
-using namespace testing;
+using namespace ::testing;
 
 DEFINE_int32(port, 8086, "udp receive port");
 DEFINE_int32(send_port, 12345, "port to send data");

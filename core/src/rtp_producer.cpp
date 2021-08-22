@@ -69,7 +69,7 @@ RtpProducer::~RtpProducer()
     }
     if (mpFileIoThreadPool)
     {
-        mpFileIoThreadPool->stop(true);
+        // TODO: stop thread pool
     }
 }
 
@@ -126,7 +126,7 @@ std::error_code RtpProducer::Init(Config config,
             },
             mFileIoBases.back().get()));
     }
-    mpFileIoThreadPool = std::make_unique<ctpl::thread_pool>(file_thread_num);
+    mpFileIoThreadPool = std::make_unique<common::ThreadPool>(file_thread_num);
 
     mpGrpcClient =
         std::make_unique<AsyncClient>(std::thread::hardware_concurrency());
@@ -523,9 +523,9 @@ void RtpProducer::RegisterVideo(VideoRequest video,
         }
         mFileVideoContextMap[video] = std::make_unique<FileVideoContext>(
             video, std::move(consumePktFunc), std::move(processErrorFunc));
-        mpFileIoThreadPool->push(
+        mpFileIoThreadPool->submit(
             [this, video(std::move(video)),
-             processSdpFunc(std::move(processSdpFunc))](int id) mutable {
+             processSdpFunc(std::move(processSdpFunc))]() mutable {
                 RegisterFileVideo(std::move(video), std::move(processSdpFunc));
             });
     }

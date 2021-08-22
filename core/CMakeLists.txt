@@ -15,6 +15,7 @@ target_link_libraries(ffvms_core
     fmt
     gflags
     glog
+    uv
     event_core
     event_pthreads
     avformat
@@ -25,11 +26,14 @@ target_link_libraries(ffvms_core
     ${RTSP_LIB}
     ${HTTP_LIB}
     grpc_common
+    thread_pool_common
+    utils_common
+    error_common
     ffvms_api
 )
 
-target_compile_features(ffvms_core PUBLIC cxx_std_17)
-set_target_properties(ffvms_core PROPERTIES CXX_EXTENSIONS OFF)
+# target_compile_features(ffvms_core PUBLIC cxx_std_17)
+# set_target_properties(ffvms_core PROPERTIES CXX_EXTENSIONS OFF)
 
 add_executable(ffvms ffvms.cpp)
 target_link_libraries(ffvms ffvms_core)

@@ -1,14 +1,15 @@
 #ifndef __NETWORK_SERVER_H__
 #define __NETWORK_SERVER_H__
 
-#include <ctpl/ctpl.h>
-#include <event2/event.h>
 #include <functional>
 #include <map>
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <queue>
 #include <shared_mutex>
+#include <thread_pool.h>
+#include <utils.hpp>
+#include <uv.h>
 
 namespace ffvms
 {
@@ -50,34 +51,32 @@ private:
 
     struct UdpEventLoop
     {
-        int socket;
-        std::unique_ptr<struct event_base,
-                        std::function<void(struct event_base *)>>
-            pUdpBase;
-        std::unique_ptr<struct event, std::function<void(struct event *)>>
-            pUdpEvent;
+        std::unique_ptr<uv_loop_t, std::function<void(uv_loop_t *)>> udpLoop;
+        std::unique_ptr<uv_udp_t, std::function<void(uv_udp_t *)>> udpHandle;
+
         std::thread udpEventLoopThread;
 
-        UdpEventLoop() = default;
+        UdpEventLoop();
         ~UdpEventLoop();
 
-        void Init(void* server, int port);
+        void Init(void *server, int port);
         void Run();
     };
 
 private:
     std::vector<std::unique_ptr<UdpEventLoop>> mpUdpWorkers;
-    std::vector<std::unique_ptr<ctpl::thread_pool>> mpUdpWorkerThreads;
-    // size == 2, udp 的收流 buffer, 交替使用
+    std::vector<std::unique_ptr<common::ThreadPool>> mpUdpWorkerThreads;
     std::mutex mBufferMutex;
+    // size == 2, udp 的收流 buffer, 交替使用
     std::vector<std::unique_ptr<char[]>> mpReceiveBuffers;
     int mBufferSize;
     int mReceiveBufferIndex; // 0 or 1
     int mCurPosition;        // current position in receive buffer
     std::shared_mutex mMutex;
     std::map<std::string, std::unique_ptr<Opaque>> mRegisteredPeer;
-    void startUdpEventLoop(void* server, int port);
+    void startUdpEventLoop(void *server, int port);
 };
+
 } // namespace core
 } // namespace ffvms
 

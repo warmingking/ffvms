@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-video_file=/workspaces/ffvms/tbut.mp4
+video_file=/ffvms/tbut.mp4
 # video_file=/workspaces/ffvms/sample.mp4
 local_port=$1
 

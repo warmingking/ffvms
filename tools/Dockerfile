@@ -1,9 +1,8 @@
-FROM ubuntu as base
+# base image
+FROM ubuntu:focal as base
 
-# set
+# set noninteractive
 ARG DEBIAN_FRONTEND=noninteractive
-ENV TZ=Asia/Shanghai
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # prepare dev env
 RUN apt-get update && \
@@ -15,24 +14,26 @@ RUN apt-get update && \
     g++ \
     cmake \
     libboost-all-dev \
-    libevent-dev \
     libavformat-dev \
     libgflags-dev \
     libgoogle-glog-dev \
     libgtest-dev
 
-RUN git config --global http.proxy http://172.17.0.1:7890
-RUN git config --global https.proxy http://172.17.0.1:7890
 RUN git config --global url."https://github.com/".insteadOf git@github.com:
 
-SHELL ["/bin/bash", "-c"]
+ARG LIB_UV_TAG=v1.42.0
+ARG LIB_UV_DIR=/var/local/git/libuv
+RUN git clone -b ${LIB_UV_TAG} https://github.com/libuv/libuv.git ${LIB_UV_DIR} && \
+    cd ${LIB_UV_DIR} && \
+    sh autogen.sh && ./configure && \
+    make -j4 && make install
 
-ARG GRPC_RELEASE_TAG=v1.35.0
+ARG GRPC_TAG=v1.35.0
 ARG GRPC_DIR=/var/local/git/grpc
 RUN apt-get install -y libssl-dev zlib1g-dev && \
-    git clone -b ${GRPC_RELEASE_TAG} https://github.com/grpc/grpc ${GRPC_DIR} && \
+    git clone -b ${GRPC_TAG} https://github.com/grpc/grpc ${GRPC_DIR} && \
     cd ${GRPC_DIR} && \
-    git submodule update --init --recursive && \
+    git submodule update --init && \
     mkdir -p cmake/build && \
     cd cmake/build && \
     cmake ../.. -DgRPC_INSTALL=ON \
@@ -52,13 +53,6 @@ ARG HTTP_PARSER_DIR=/var/local/git/http-parser
 RUN git clone -b ${HTTP_PARSER_TAG} https://github.com/ploxiln/http-parser ${HTTP_PARSER_DIR} && \
     cd ${HTTP_PARSER_DIR} && \
     make && make install
-
-ARG CTPL_TAG=master
-ARG CTPL_DIR=/var/local/git/ctpl
-RUN git clone -b ${CTPL_TAG} https://github.com/vit-vit/CTPL ${CTPL_DIR} && \
-    mkdir /usr/include/ctpl && \
-    mkdir /usr/local/include/ctpl && \
-    cp ${CTPL_DIR}/*.h /usr/local/include/ctpl
 
 ARG MEDIA_SERVER_TAG=master
 ARG MEDIA_SERVER_DIR=/var/local/git/media-server
@@ -92,25 +86,32 @@ RUN git clone -b ${JSON_TAG} https://github.com/nlohmann/json.git ${JSON_DIR} &&
 
 RUN apt-get autoremove -y
 
-# for convenience
+# dev image
 FROM base AS dev
-ENV HTTP_PROXY="http://127.0.0.1:7890"
-ENV HTTPS_PROXY="http://127.0.0.1:7890"
+
+ARG TIMEZONE
+ENV TZ=$TIMEZONE
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 RUN apt-get update && \
-    apt-get install -y sudo gdb lsof net-tools netcat zsh zsh-antigen ffmpeg linux-tools-5.4.0-70-generic wget unzip && \
+    apt-get install -y openssh-server sudo gdb lsof net-tools netcat zsh zsh-antigen ffmpeg linux-tools-5.4.0-70-generic wget unzip && \
     apt-get autoremove -y
 
 RUN wget -q https://github.com/brendangregg/FlameGraph/archive/master.zip && \
     unzip master.zip && \
     mv FlameGraph-master/ /opt/FlameGraph
 
+RUN mkdir /run/sshd
+
 ENV PATH="/opt/FlameGraph:${PATH}"
 
-ARG USER=icefe
-ARG UID=1000
-ARG GID=1000
-ARG PW=12345678
+ARG USER
+ARG UID
+ARG GID
+ARG PW
 
 RUN useradd -m -G sudo -s /usr/bin/zsh ${USER} && echo "${USER}:${PW}" | chpasswd
-USER ${UID}:${GID}
+
+# release image
+FROM base AS release
+RUN rm -rf /var/local/git/

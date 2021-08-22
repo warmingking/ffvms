@@ -5,7 +5,7 @@
 
 using namespace ffvms::core;
 using namespace google;
-using namespace testing;
+using namespace ::testing;
 
 DEFINE_int32(rtsp_port, 8554, "rtsp port");
 DEFINE_int32(event_thread_num, 1, "event thread number");

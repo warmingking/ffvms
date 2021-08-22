@@ -4,7 +4,7 @@
 #include "async_client.h"
 #include "network_server.h"
 #include "video_greeter.grpc.pb.h"
-#include <ctpl/ctpl.h>
+#include <thread_pool.h>
 #include <event2/event.h>
 #include <functional>
 #include <map>
@@ -164,7 +164,7 @@ private:
     std::vector<
         std::unique_ptr<struct event, std::function<void(struct event *)>>>
         mFileKeepAliveEvents;
-    std::unique_ptr<ctpl::thread_pool> mpFileIoThreadPool;
+    std::unique_ptr<common::ThreadPool> mpFileIoThreadPool;
     std::map<VideoRequest, std::unique_ptr<FileVideoContext>>
         mFileVideoContextMap;
     std::shared_mutex mFileContextMutex;
@@ -194,7 +194,7 @@ public:
 
         // 放弃线程池的方式实现, 原因是需要一次 data copy
         // rtp demuxer 不是线程安全的, 使用 size = 1 的线程池保护
-        // std::unique_ptr<ctpl::thread_pool> demuxThread;
+        // std::unique_ptr<common::ThreadPool> demuxThread;
         std::mutex demuxMutex;
 
         RtpVideoContext(const VideoRequest &video,
@@ -203,7 +203,7 @@ public:
                         ProcessErrorFunction &&processErrorFunc)
             : videoRequest(video), processSdpFunc(processSdpFunc),
               consumePktFunc(consumePktFunc), processErrorFunc(processErrorFunc)
-        //   demuxThread(std::make_unique<ctpl::thread_pool>(1))
+        //   demuxThread(std::make_unique<common::ThreadPool>(1))
         {
         }
 

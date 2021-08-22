@@ -87,7 +87,7 @@ public:
         auto it = mPushSessions.find(request->inviteid());
         if (it != mPushSessions.end())
         {
-            std::string command = "/workspaces/ffvms/push_rtp.sh";
+            std::string command = "/ffvms/push_rtp.sh";
             char *const argv[] = {
                 const_cast<char *>(command.c_str()),
                 const_cast<char *>(
