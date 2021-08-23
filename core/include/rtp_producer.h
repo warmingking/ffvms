@@ -213,7 +213,7 @@ public:
         static struct rtp_event_t RtpEventHandler;
     };
 
-    std::map<VideoRequest, std::unique_ptr<RtpVideoContext>>
+    std::map<VideoRequest, std::shared_ptr<RtpVideoContext>>
         mRtpVideoContextMap;
     std::shared_mutex mRtpContextMutex;
     std::unique_ptr<VideoGreeter::Stub> mpStub;

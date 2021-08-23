@@ -12,6 +12,7 @@ target_include_directories(ffvms_core
 )
 
 target_link_libraries(ffvms_core
+    tcmalloc_minimal
     fmt
     gflags
     glog

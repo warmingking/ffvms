@@ -3,6 +3,7 @@ project(ffvms)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
 
 function(protobuf_generate_grpc_cpp SRCS HDRS GENERATED_DIR)
   if(NOT ARGN)

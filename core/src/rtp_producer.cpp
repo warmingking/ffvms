@@ -22,14 +22,11 @@ struct rtp_payload_t RtpProducer::RtpVideoContext::RtpPayloadFunc
         // free
         [](void *param, void *packet) {
             RtpVideoContext *context = static_cast<RtpVideoContext *>(param);
-            LOG_IF(FATAL, context->packet.get() != packet)
-                << "free unknown rtp packet";
+            LOG_IF(FATAL, context->packet.get() != packet) << "free unknown rtp packet";
         },
         // packet
-        [](void *param, const void *packet, int bytes, uint32_t timestamp,
-           int flags) {
-            VLOG_EVERY_N(1, 10)
-                << "on packet length " << bytes << ", send to rtsp server";
+        [](void *param, const void *packet, int bytes, uint32_t timestamp, int flags) {
+            VLOG_EVERY_N(1, 10) << "on packet length " << bytes << ", send to rtsp server";
             RtpVideoContext *context = static_cast<RtpVideoContext *>(param);
 
             /*
@@ -75,8 +72,7 @@ RtpProducer::~RtpProducer()
 
 RtpProducer::RtpProducer() : mEventBaseCursor(0) {}
 
-std::error_code RtpProducer::Init(Config config,
-                                  std::shared_ptr<NetworkServer> networkServer)
+std::error_code RtpProducer::Init(Config config, std::shared_ptr<NetworkServer> networkServer)
 {
     mpNetworkServer = networkServer;
     mConfig = config;
@@ -86,16 +82,13 @@ std::error_code RtpProducer::Init(Config config,
         LOG(FATAL) << "evthread use pthread failed, ret: " << ret;
     }
 
-    int file_thread_num = config.file_event_thread_num == -1
-                              ? std::thread::hardware_concurrency()
-                              : config.file_event_thread_num;
+    int file_thread_num = config.file_event_thread_num == -1 ? std::thread::hardware_concurrency()
+                                                             : config.file_event_thread_num;
     for (int i = 0; i < file_thread_num; ++i)
     {
         mFileIoBases.emplace_back(
-            std::unique_ptr<struct event_base,
-                            std::function<void(struct event_base *)>>(
-                event_base_new(),
-                [](struct event_base *eb) { event_base_free(eb); }));
+            std::unique_ptr<struct event_base, std::function<void(struct event_base *)>>(
+                event_base_new(), [](struct event_base *eb) { event_base_free(eb); }));
         if (!mFileIoBases.back())
         {
             LOG(FATAL) << "create event base failed, with errno: " << errno;
@@ -111,42 +104,37 @@ std::error_code RtpProducer::Init(Config config,
                     },
                     NULL),
                 [](struct event *ev) { event_free(ev); }));
-        if (!mFileKeepAliveEvents.back() ||
-            event_add(mFileKeepAliveEvents.back().get(), &frameInterval) < 0)
+        if (!mFileKeepAliveEvents.back()
+            || event_add(mFileKeepAliveEvents.back().get(), &frameInterval) < 0)
         {
-            LOG(FATAL) << "create/add keepalive event failed, with errno: "
-                       << errno;
+            LOG(FATAL) << "create/add keepalive event failed, with errno: " << errno;
         }
 
         mFileThreads.emplace_back(std::make_unique<std::thread>(
             [i](struct event_base *base) {
                 int ret = event_base_dispatch(base);
-                LOG_IF(ERROR, ret != 0)
-                    << "file event loop " << i << " exist with code " << ret;
+                LOG_IF(ERROR, ret != 0) << "file event loop " << i << " exist with code " << ret;
             },
             mFileIoBases.back().get()));
     }
     mpFileIoThreadPool = std::make_unique<common::ThreadPool>(file_thread_num);
 
-    mpGrpcClient =
-        std::make_unique<AsyncClient>(std::thread::hardware_concurrency());
+    mpGrpcClient = std::make_unique<AsyncClient>(std::thread::hardware_concurrency());
 
-    mpStub = std::move(VideoGreeter::NewStub(grpc::CreateChannel(
-        config.sipper_host, grpc::InsecureChannelCredentials())));
+    mpStub = std::move(VideoGreeter::NewStub(
+        grpc::CreateChannel(config.sipper_host, grpc::InsecureChannelCredentials())));
 
     return FFVMS_SUCC;
 }
 
-void RtpProducer::FileVideoContext::FFGetFrame(evutil_socket_t fd, short what,
-                                               void *arg)
+void RtpProducer::FileVideoContext::FFGetFrame(evutil_socket_t fd, short what, void *arg)
 {
     // av_read_frame in event loop
-    RtpProducer::FileVideoContext *pVideoContext =
-        (RtpProducer::FileVideoContext *)arg;
+    RtpProducer::FileVideoContext *pVideoContext = (RtpProducer::FileVideoContext *)arg;
     if (pVideoContext->error != 0)
     {
-        LOG(ERROR) << "video " << pVideoContext->videoRequest
-                   << " stopped with error code " << pVideoContext->error;
+        LOG(ERROR) << "video " << pVideoContext->videoRequest << " stopped with error code "
+                   << pVideoContext->error;
         return;
     }
     bool getVideoPkt(false); // 用来过滤音频流
@@ -162,16 +150,13 @@ void RtpProducer::FileVideoContext::FFGetFrame(evutil_socket_t fd, short what,
             {
                 if (pVideoContext->videoRequest.repeatedly)
                 {
-                    VLOG(1) << "read frame for video "
-                            << pVideoContext->videoRequest
+                    VLOG(1) << "read frame for video " << pVideoContext->videoRequest
                             << " eof, will repeat read";
                     bool seekSucc(true);
-                    for (size_t i = 0; i < pVideoContext->iFmtCtx->nb_streams;
-                         ++i)
+                    for (size_t i = 0; i < pVideoContext->iFmtCtx->nb_streams; ++i)
                     {
                         const auto stream = pVideoContext->iFmtCtx->streams[i];
-                        ret =
-                            avio_seek(pVideoContext->iFmtCtx->pb, 0, SEEK_SET);
+                        ret = avio_seek(pVideoContext->iFmtCtx->pb, 0, SEEK_SET);
                         if (ret < 0)
                         {
                             seekSucc = false;
@@ -180,8 +165,8 @@ void RtpProducer::FileVideoContext::FFGetFrame(evutil_socket_t fd, short what,
                                           "to start";
                             break;
                         }
-                        ret = avformat_seek_file(pVideoContext->iFmtCtx, i, 0,
-                                                 0, stream->duration, 0);
+                        ret = avformat_seek_file(pVideoContext->iFmtCtx, i, 0, 0, stream->duration,
+                                                 0);
                         if (ret < 0)
                         {
                             seekSucc = false;
@@ -233,10 +218,9 @@ void RtpProducer::FileVideoContext::FFGetFrame(evutil_socket_t fd, short what,
 
         /* copy packet */
         const auto &streamId = pVideoContext->videoStreamId; // alias
-        av_packet_rescale_ts(
-            pVideoContext->pkt.get(),
-            pVideoContext->iFmtCtx->streams[streamId]->time_base,
-            pVideoContext->oFmtCtx->streams[0]->time_base);
+        av_packet_rescale_ts(pVideoContext->pkt.get(),
+                             pVideoContext->iFmtCtx->streams[streamId]->time_base,
+                             pVideoContext->oFmtCtx->streams[0]->time_base);
         // pVideoContext->pkt->pts = av_rescale_q_rnd(
         //     pVideoContext->pkt->pts,
         //     pVideoContext->iFmtCtx->streams[streamId]->time_base,
@@ -256,16 +240,16 @@ void RtpProducer::FileVideoContext::FFGetFrame(evutil_socket_t fd, short what,
         if (pVideoContext->pkt->duration == 0)
         {
             pVideoContext->pkt->duration =
-                (pVideoContext->iFmtCtx->streams[streamId]->time_base.den *
-                 pVideoContext->fps.second) /
-                (pVideoContext->fps.first *
-                 pVideoContext->iFmtCtx->streams[streamId]->time_base.num);
+                (pVideoContext->iFmtCtx->streams[streamId]->time_base.den
+                 * pVideoContext->fps.second)
+                / (pVideoContext->fps.first
+                   * pVideoContext->iFmtCtx->streams[streamId]->time_base.num);
         }
         // VLOG_EVERY_N(1, 100) << "pts: " << pVideoContext->pkt->pts
         //                       << ", dts: " << pVideoContext->pkt->dts
         //                       << ", prePts: " << pVideoContext->prePts;
-        if (pVideoContext->pkt->pts == AV_NOPTS_VALUE ||
-            pVideoContext->pkt->pts <= pVideoContext->prePts)
+        if (pVideoContext->pkt->pts == AV_NOPTS_VALUE
+            || pVideoContext->pkt->pts <= pVideoContext->prePts)
         {
             // VLOG_EVERY_N(1, 100) << "pts: " << pVideoContext->pkt->pts
             //                     << ", dts: " << pVideoContext->pkt->dts;
@@ -277,8 +261,7 @@ void RtpProducer::FileVideoContext::FFGetFrame(evutil_socket_t fd, short what,
             }
             else if (pVideoContext->pkt->dts <= pVideoContext->prePts)
             {
-                pVideoContext->pts =
-                    pVideoContext->prePts + pVideoContext->pkt->duration;
+                pVideoContext->pts = pVideoContext->prePts + pVideoContext->pkt->duration;
                 pVideoContext->pkt->pts = pVideoContext->pts;
                 pVideoContext->pkt->dts = pVideoContext->pts;
             }
@@ -288,12 +271,10 @@ void RtpProducer::FileVideoContext::FFGetFrame(evutil_socket_t fd, short what,
             }
         }
         pVideoContext->prePts = pVideoContext->pkt->pts;
-        ret = av_interleaved_write_frame(pVideoContext->oFmtCtx,
-                                         pVideoContext->pkt.get());
+        ret = av_interleaved_write_frame(pVideoContext->oFmtCtx, pVideoContext->pkt.get());
         if (ret < 0)
         {
-            LOG(ERROR) << "error muxing packet for video "
-                       << pVideoContext->videoRequest;
+            LOG(ERROR) << "error muxing packet for video " << pVideoContext->videoRequest;
             break;
         }
     } while (!getVideoPkt);
@@ -301,16 +282,13 @@ void RtpProducer::FileVideoContext::FFGetFrame(evutil_socket_t fd, short what,
     {
         pVideoContext->error = ret;
         char buf[1024];
-        LOG(ERROR) << "get frame failed for video "
-                   << pVideoContext->videoRequest
+        LOG(ERROR) << "get frame failed for video " << pVideoContext->videoRequest
                    << ", for reason: " << av_make_error_string(buf, 1024, ret);
-        pVideoContext->processErrorFunc(
-            std::make_error_code(std::errc::invalid_argument));
+        pVideoContext->processErrorFunc(std::make_error_code(std::errc::invalid_argument));
     }
 }
 
-void RtpProducer::RegisterFileVideo(VideoRequest &&video,
-                                    ProcessSdpFunction &&processSdpFunc)
+void RtpProducer::RegisterFileVideo(VideoRequest &&video, ProcessSdpFunction &&processSdpFunc)
 {
     int ret(0);
     do
@@ -320,8 +298,7 @@ void RtpProducer::RegisterFileVideo(VideoRequest &&video,
         auto it = mFileVideoContextMap.find(video);
         if (it == mFileVideoContextMap.end())
         {
-            LOG(ERROR) << "video " << video
-                       << " not found in cache, may have been unregistered";
+            LOG(ERROR) << "video " << video << " not found in cache, may have been unregistered";
             break;
         }
         auto &pVideoContext = it->second;
@@ -353,8 +330,7 @@ void RtpProducer::RegisterFileVideo(VideoRequest &&video,
 
         // 获取 fps, 用于控制 read frame 的频率
         AVStream *stream = iFmtCtx->streams[pVideoContext->videoStreamId];
-        fps = std::make_pair<>(stream->avg_frame_rate.num,
-                               stream->avg_frame_rate.den);
+        fps = std::make_pair<>(stream->avg_frame_rate.num, stream->avg_frame_rate.den);
         // mux 成 RTP 格式输出
         ret = avformat_alloc_output_context2(&oFmtCtx, NULL, "rtp", NULL);
         if (ret < 0)
@@ -382,8 +358,7 @@ void RtpProducer::RegisterFileVideo(VideoRequest &&video,
 
         // 自定义 write_packet callback
         AVIOContext *oioContext = avio_alloc_context(
-            pVideoContext->buf.get(), FileVideoContext::bufSize, 1,
-            it->second.get(), NULL,
+            pVideoContext->buf.get(), FileVideoContext::bufSize, 1, it->second.get(), NULL,
             [](void *opaque, uint8_t *buf, int bufsize) {
                 const FileVideoContext *context = (FileVideoContext *)opaque;
                 context->consumePktFunc((char *)buf, bufsize);
@@ -397,8 +372,8 @@ void RtpProducer::RegisterFileVideo(VideoRequest &&video,
         av_dump_format(pVideoContext->oFmtCtx, 0, NULL, 1);
 
         // 获取 sdp
-        auto buf = std::unique_ptr<char, std::function<void(char *)>>(
-            new char[MAX_SDP_LENGTH], [](char *c) { delete[] c; });
+        auto buf = std::unique_ptr<char, std::function<void(char *)>>(new char[MAX_SDP_LENGTH],
+                                                                      [](char *c) { delete[] c; });
         ret = av_sdp_create(&oFmtCtx, 1, buf.get(), MAX_SDP_LENGTH);
         if (ret < 0)
         {
@@ -408,8 +383,7 @@ void RtpProducer::RegisterFileVideo(VideoRequest &&video,
         ret = avformat_write_header(oFmtCtx, NULL);
         if (ret < 0)
         {
-            LOG(ERROR) << "error occurred when write header for video "
-                       << video;
+            LOG(ERROR) << "error occurred when write header for video " << video;
             break;
         }
         processSdpFunc(std::string(buf.get()));
@@ -420,16 +394,13 @@ void RtpProducer::RegisterFileVideo(VideoRequest &&video,
         struct timeval frameInterval = {0, microseconds};
         pVideoContext->mpFileEvent =
             std::unique_ptr<struct event, std::function<void(struct event *)>>(
-                event_new(mFileIoBases[index].get(), -1,
-                          EV_TIMEOUT | EV_PERSIST,
-                          RtpProducer::FileVideoContext::FFGetFrame,
-                          it->second.get()),
+                event_new(mFileIoBases[index].get(), -1, EV_TIMEOUT | EV_PERSIST,
+                          RtpProducer::FileVideoContext::FFGetFrame, it->second.get()),
                 [](struct event *ev) { event_free(ev); });
-        if (!it->second->mpFileEvent ||
-            event_add(it->second->mpFileEvent.get(), &frameInterval) < 0)
+        if (!it->second->mpFileEvent
+            || event_add(it->second->mpFileEvent.get(), &frameInterval) < 0)
         {
-            LOG(ERROR) << "create/add read frame event failed for video "
-                       << video;
+            LOG(ERROR) << "create/add read frame event failed for video " << video;
             break;
         }
         return;
@@ -444,25 +415,20 @@ void RtpProducer::RegisterFileVideo(VideoRequest &&video,
         auto it = mFileVideoContextMap.find(video);
         if (it == mFileVideoContextMap.end())
         {
-            LOG(ERROR) << "video " << video
-                       << " not found in cache, may have been unregistered";
+            LOG(ERROR) << "video " << video << " not found in cache, may have been unregistered";
         }
-        it->second->processErrorFunc(
-            std::make_error_code(std::errc::invalid_argument));
+        it->second->processErrorFunc(std::make_error_code(std::errc::invalid_argument));
     }
     // probe 失败, 自动清理 mFileVideoContextMap, 不需要 unregister
     std::unique_lock _(mFileContextMutex);
     mFileVideoContextMap.erase(video);
 }
 
-int RtpProducer::RtpVideoContext::RtpOnPacket(void *param, const void *packet,
-                                              int bytes, uint32_t timestamp,
-                                              int flags)
+int RtpProducer::RtpVideoContext::RtpOnPacket(void *param, const void *packet, int bytes,
+                                              uint32_t timestamp, int flags)
 {
-    VLOG_EVERY_N(1, 10) << "rtp on packet length " << bytes
-                        << ", send to payload encoder";
-    RtpProducer::RtpVideoContext *context =
-        static_cast<RtpProducer::RtpVideoContext *>(param);
+    VLOG_EVERY_N(1, 10) << "rtp on packet length " << bytes << ", send to payload encoder";
+    RtpProducer::RtpVideoContext *context = static_cast<RtpProducer::RtpVideoContext *>(param);
 
     int ret(0);
     if (context->payloadBuf)
@@ -472,14 +438,12 @@ int RtpProducer::RtpVideoContext::RtpOnPacket(void *param, const void *packet,
         *(context->payloadBuf.get() + 2) = 1;
         memcpy(context->payloadBuf.get() + 3, packet, bytes);
 
-        ret = rtp_payload_encode_input(context->payloadEncoder.get(),
-                                       context->payloadBuf.get(), bytes + 3,
-                                       timestamp);
+        ret = rtp_payload_encode_input(context->payloadEncoder.get(), context->payloadBuf.get(),
+                                       bytes + 3, timestamp);
     }
     else
     {
-        ret = rtp_payload_encode_input(context->payloadEncoder.get(), packet,
-                                       bytes, timestamp);
+        ret = rtp_payload_encode_input(context->payloadEncoder.get(), packet, bytes, timestamp);
     }
 
     LOG_IF(ERROR, ret != 0) << "payload input failed, ret " << ret;
@@ -487,8 +451,7 @@ int RtpProducer::RtpVideoContext::RtpOnPacket(void *param, const void *packet,
     return ret;
 }
 
-void RtpProducer::RegisterVideo(VideoRequest video,
-                                ProcessSdpFunction &&processSdpFunc,
+void RtpProducer::RegisterVideo(VideoRequest video, ProcessSdpFunction &&processSdpFunc,
                                 ConsumePktFuction &&consumePktFunc,
                                 ProcessErrorFunction &&processErrorFunc)
 {
@@ -515,17 +478,14 @@ void RtpProducer::RegisterVideo(VideoRequest video,
         auto it = mFileVideoContextMap.find(video);
         if (it != mFileVideoContextMap.end())
         {
-            LOG(INFO) << "video " << video
-                      << " already exist, not register multi times";
-            processErrorFunc(
-                std::make_error_code(std::errc::too_many_files_open));
+            LOG(INFO) << "video " << video << " already exist, not register multi times";
+            processErrorFunc(std::make_error_code(std::errc::too_many_files_open));
             return;
         }
         mFileVideoContextMap[video] = std::make_unique<FileVideoContext>(
             video, std::move(consumePktFunc), std::move(processErrorFunc));
         mpFileIoThreadPool->submit(
-            [this, video(std::move(video)),
-             processSdpFunc(std::move(processSdpFunc))]() mutable {
+            [this, video(std::move(video)), processSdpFunc(std::move(processSdpFunc))]() mutable {
                 RegisterFileVideo(std::move(video), std::move(processSdpFunc));
             });
     }
@@ -535,15 +495,15 @@ void RtpProducer::RegisterVideo(VideoRequest video,
         auto it = mRtpVideoContextMap.find(video);
         if (it != mRtpVideoContextMap.end())
         {
-            LOG(ERROR) << "video " << video
-                       << " already exist, not register multi times";
-            processErrorFunc(
-                std::make_error_code(std::errc::too_many_files_open));
+            LOG(ERROR) << "video " << video << " already exist, not register multi times";
+            processErrorFunc(std::make_error_code(std::errc::too_many_files_open));
             return;
         }
-        mRtpVideoContextMap[video] = std::make_unique<RtpVideoContext>(
-            video, std::move(processSdpFunc), std::move(consumePktFunc),
-            std::move(processErrorFunc));
+        auto pContext = std::make_shared<RtpVideoContext>(video, std::move(processSdpFunc),
+                                                          std::move(consumePktFunc),
+                                                          std::move(processErrorFunc));
+        std::weak_ptr<RtpVideoContext> pWeakContext = pContext;
+        mRtpVideoContextMap[video] = pContext;
 
         InviteVideoRequest request;
         auto *gbInviteRequest = request.mutable_gbinviterequest();
@@ -552,12 +512,10 @@ void RtpProducer::RegisterVideo(VideoRequest video,
         switch (video.gbStreamingMode)
         {
         case TCP:
-            gbInviteRequest->set_transmission(
-                InviteVideoRequest_GBInviteRequest_Transmission_TCP);
+            gbInviteRequest->set_transmission(InviteVideoRequest_GBInviteRequest_Transmission_TCP);
             break;
         case UDP:
-            gbInviteRequest->set_transmission(
-                InviteVideoRequest_GBInviteRequest_Transmission_UDP);
+            gbInviteRequest->set_transmission(InviteVideoRequest_GBInviteRequest_Transmission_UDP);
             break;
         default:
             LOG(ERROR) << "unkown gbStreamingMode " << video.gbStreamingMode;
@@ -565,130 +523,99 @@ void RtpProducer::RegisterVideo(VideoRequest video,
             return;
         }
         mpGrpcClient->Call<InviteVideoRequest, InviteVideoResponse>(
-            [this](ClientContext *context, const InviteVideoRequest &request,
-                   CompletionQueue *cq) {
+            [this](ClientContext *context, const InviteVideoRequest &request, CompletionQueue *cq) {
                 return mpStub->PrepareAsyncInviteVideo(context, request, cq);
             },
             request, mConfig.rpc_timeout_in_ms,
-            [this, video(std::move(video))](
-                std::unique_ptr<InviteVideoResponse> &&response,
-                std::unique_ptr<::grpc::Status> &&error) {
+            [this, video(std::move(video)),
+             pWeakContext(std::move(pWeakContext))](std::unique_ptr<InviteVideoResponse> &&response,
+                                                    std::unique_ptr<::grpc::Status> &&error) { 
                 std::shared_lock _(mRtpContextMutex);
-                auto it = mRtpVideoContextMap.find(video);
-                if (it == mRtpVideoContextMap.end())
+                auto pVideoContext = pWeakContext.lock();
+                if (!pVideoContext)
                 {
                     LOG(ERROR) << "video " << video
                                << " not found in cache, may have been "
                                   "unregistered";
                     return;
                 }
-                auto &pVideoContext = it->second;
                 bool succ(false);
                 do
                 {
                     if (error && !error->ok())
                     {
-                        LOG(ERROR)
-                            << "invite failed for video " << video
-                            << ", error code: " << error->error_code()
-                            << ", error message: " << error->error_message();
+                        LOG(ERROR) << "invite failed for video " << video
+                                   << ", error code: " << error->error_code()
+                                   << ", error message: " << error->error_message();
                         break;
                     }
 
                     // 检查这路流是否已经被关闭
-                    std::shared_lock _(mRtpContextMutex);
-                    auto it = mRtpVideoContextMap.find(video);
-                    if (it == mRtpVideoContextMap.end())
-                    {
-                        LOG(ERROR) << "video " << video
-                                   << " not found in cache, may have been "
-                                      "unregistered";
-                        return;
-                    }
-                    auto &pVideoContext = it->second;
+                    // TODO: 感觉会死锁, 上面拿的锁还没有释放
+                    // std::shared_lock _(mRtpContextMutex);
                     switch (response->inviteResponse_case())
                     {
                     case InviteVideoResponse::kGbInviteResponse:
                     {
                         auto &gbInviteResponse = response->gbinviteresponse();
-                        pVideoContext->packet =
-                            std::unique_ptr<char, std::function<void(char *)>>(
-                                new char[1600],
-                                [](char *packet) { delete[] packet; });
+                        pVideoContext->packet = std::unique_ptr<char, std::function<void(char *)>>(
+                            new char[1600], [](char *packet) { delete[] packet; });
                         if (gbInviteResponse.encoding() == "H264")
                         {
                             pVideoContext->payloadBuf =
-                                std::unique_ptr<char,
-                                                std::function<void(char *)>>(
-                                    new char[mConfig.max_bandwidth_in_mb *
-                                             1024 * 1024],
+                                std::unique_ptr<char, std::function<void(char *)>>(
+                                    new char[mConfig.max_bandwidth_in_mb * 1024 * 1024],
                                     [](char *buf) { delete[] buf; });
                         }
                         pVideoContext->inviteId = response->inviteid();
-                        pVideoContext->demuxer = std::unique_ptr<
-                            rtp_demuxer_t,
-                            std::function<void(rtp_demuxer_t *)>>(
-                            rtp_demuxer_create(
-                                mConfig.rtp_jitter_in_ms,
-                                gbInviteResponse.frequency(),
-                                gbInviteResponse.payload(),
-                                gbInviteResponse.encoding().c_str(),
-                                RtpProducer::RtpVideoContext::RtpOnPacket,
-                                pVideoContext.get()), // context 作为 param
-                            [](rtp_demuxer_t *demuxer) {
-                                rtp_demuxer_destroy(&demuxer);
-                            });
+                        pVideoContext->demuxer =
+                            std::unique_ptr<rtp_demuxer_t, std::function<void(rtp_demuxer_t *)>>(
+                                rtp_demuxer_create(
+                                    mConfig.rtp_jitter_in_ms, gbInviteResponse.frequency(),
+                                    gbInviteResponse.payload(), gbInviteResponse.encoding().c_str(),
+                                    RtpProducer::RtpVideoContext::RtpOnPacket,
+                                    pVideoContext.get()), // context 作为 param
+                                [](rtp_demuxer_t *demuxer) { rtp_demuxer_destroy(&demuxer); });
                         if (!pVideoContext->demuxer)
                         {
-                            LOG(ERROR) << "create rtp demux failed for video "
-                                       << video;
+                            LOG(ERROR) << "create rtp demux failed for video " << video;
                             break;
                         }
 
                         uint32_t ssrc = rand();
-                        pVideoContext->payloadEncoder = std::unique_ptr<
-                            void, std::function<void(void *)>>(
-                            rtp_payload_encode_create(
-                                gbInviteResponse.payload(),
-                                gbInviteResponse.encoding().c_str(),
-                                (uint16_t)ssrc, ssrc,
-                                &RtpProducer::RtpVideoContext::RtpPayloadFunc,
-                                pVideoContext.get()),
-                            [](void *encoder) {
-                                rtp_payload_encode_destroy(encoder);
-                            });
+                        pVideoContext->payloadEncoder =
+                            std::unique_ptr<void, std::function<void(void *)>>(
+                                rtp_payload_encode_create(
+                                    gbInviteResponse.payload(), gbInviteResponse.encoding().c_str(),
+                                    (uint16_t)ssrc, ssrc,
+                                    &RtpProducer::RtpVideoContext::RtpPayloadFunc,
+                                    pVideoContext.get()),
+                                [](void *encoder) { rtp_payload_encode_destroy(encoder); });
                         if (!pVideoContext->payloadEncoder)
                         {
-                            LOG(ERROR)
-                                << "create payload encoder failed for video "
-                                << video;
+                            LOG(ERROR) << "create payload encoder failed for video " << video;
                             break;
                         }
 
-                        pVideoContext->rtp = std::unique_ptr<
-                            void, std::function<void(void *)>>(
-                            rtp_create(
-                                &RtpProducer::RtpVideoContext::RtpEventHandler,
-                                pVideoContext.get(), ssrc, ssrc,
-                                gbInviteResponse.frequency(),
-                                mConfig.max_bandwidth_in_mb * 1024 * 1024,
-                                1 /*sender*/),
+                        pVideoContext->rtp = std::unique_ptr<void, std::function<void(void *)>>(
+                            rtp_create(&RtpProducer::RtpVideoContext::RtpEventHandler,
+                                       pVideoContext.get(), ssrc, ssrc,
+                                       gbInviteResponse.frequency(),
+                                       mConfig.max_bandwidth_in_mb * 1024 * 1024, 1 /*sender*/),
                             [](void *rtp) { rtp_destroy(rtp); });
 
                         succ = true;
                         // TODO: 根据 payload 调整
-                        pVideoContext->processSdpFunc(
-                            fmt::format("v=0\n"
-                                        "o=- 0 0 IN IP4 127.0.0.1\n"
-                                        "s=gb:{}\n"
-                                        "c=IN IP4 127.0.0.1\n"
-                                        "m=video 0 RTP/AVP {}\n"
-                                        "t=0 0\n"
-                                        "a=rtpmap:{} {}/{}",
-                                        video.gbid, gbInviteResponse.payload(),
-                                        gbInviteResponse.payload(),
-                                        gbInviteResponse.encoding(),
-                                        gbInviteResponse.frequency()));
+                        pVideoContext->processSdpFunc(fmt::format(
+                            "v=0\n"
+                            "o=- 0 0 IN IP4 127.0.0.1\n"
+                            "s=gb:{}\n"
+                            "c=IN IP4 127.0.0.1\n"
+                            "m=video 0 RTP/AVP {}\n"
+                            "t=0 0\n"
+                            "a=rtpmap:{} {}/{}",
+                            video.gbid, gbInviteResponse.payload(), gbInviteResponse.payload(),
+                            gbInviteResponse.encoding(), gbInviteResponse.frequency()));
                         // fmt::format("v=0\n"
                         //             "o=- 0 0 IN IP4 127.0.0.1\n"
                         //             "s=gb:{}\n"
@@ -707,78 +634,62 @@ void RtpProducer::RegisterVideo(VideoRequest video,
                         // 后直接丢给 rtp_demuxer
                         mpNetworkServer->registerPeer(
                             gbInviteResponse.peerinfo(),
-                            [this, video](const char *data, const size_t len) {
+                            [this, video, pWeakContext(std::move(pWeakContext))](const char *data, const size_t len) {
                                 std::shared_lock _(mRtpContextMutex);
-                                auto it = mRtpVideoContextMap.find(video);
-                                if (it == mRtpVideoContextMap.end())
+                                auto pVideoContext = pWeakContext.lock();
+                                if (!pVideoContext)
                                 {
                                     VLOG(1) << "video context not found, "
                                                "may be unregistered";
                                     return;
                                 }
                                 VLOG_EVERY_N(1, 10)
-                                    << "video " << video
-                                    << " get packet, size : " << len;
-                                /*
-                                                                if
-                                   (it->second->videoRequest.gbid == "1234")
-                                                                {
-                                                                    LOG_EVERY_N(INFO,
-                                   1000)
-                                                                        << "dump
-                                   " << it->second->videoRequest
-                                                                        << " to
-                                   file tbut_in.rtp"; std::ofstream file(
-                                                                        "/workspaces/ffvms/tbut_in.rtp",
-                                                                        std::ios::binary
-                                   | std::ios::app);
-                                                                    // 先用 2
-                                   位保存 rtp 包的长度, 然后保存 rtp
-                                                                    // 包
-                                                                    char
-                                   lenHeader[2] = {0, 0}; lenHeader[0] = len >>
-                                   8; lenHeader[1] = len & 0xFF;
-                                                                    file.write(lenHeader,
-                                   2); file.write(data, len);
-                                                                }
-                                */
-                                rtp_demuxer_input(it->second->demuxer.get(),
-                                                  data, len);
+                                    << "video " << video << " get packet, size : " << len;
+
+                                // if (pVideoContext->videoRequest.gbid == "demo6")
+                                // {
+                                //     LOG_EVERY_N(INFO, 1000) << "dump " << pVideoContext->videoRequest
+                                //                             << " to file tbut_in.rtp";
+                                //     std::ofstream file("/ffvms/tbut_in.rtp",
+                                //                        std::ios::binary | std::ios::app);
+                                //     // 先用 2 位保存 rtp 包的长度, 然后保存 rtp
+                                //     // 包
+                                //     char lenHeader[2] = {0, 0};
+                                //     lenHeader[0] = len >> 8;
+                                //     lenHeader[1] = len & 0xFF;
+                                //     file.write(lenHeader, 2);
+                                //     file.write(data, len);
+                                // }
+
+                                rtp_demuxer_input(pVideoContext->demuxer.get(), data, len);
                             });
 
                         SendAckRequest request;
                         request.set_inviteid(response->inviteid());
                         mpGrpcClient->Call<SendAckRequest, SendAckResponse>(
-                            [this](ClientContext *context,
-                                   const SendAckRequest &request,
+                            [this](ClientContext *context, const SendAckRequest &request,
                                    CompletionQueue *cq) {
-                                return mpStub->PrepareAsyncSendAck(context,
-                                                                   request, cq);
+                                return mpStub->PrepareAsyncSendAck(context, request, cq);
                             },
                             request, 0,
-                            [video(std::move(video))](
-                                std::unique_ptr<SendAckResponse> &&response,
-                                std::unique_ptr<::grpc::Status> &&error) {
+                            [video(std::move(video))](std::unique_ptr<SendAckResponse> &&response,
+                                                      std::unique_ptr<::grpc::Status> &&error) {
                                 if (error && !error->ok())
                                 {
-                                    LOG(ERROR) << "send ack failed for video "
-                                               << video << ", error code: "
-                                               << error->error_code()
-                                               << ", error message: "
-                                               << error->error_message();
+                                    LOG(ERROR) << "send ack failed for video " << video
+                                               << ", error code: " << error->error_code()
+                                               << ", error message: " << error->error_message();
                                 }
                                 else
                                 {
-                                    VLOG(1)
-                                        << "send ack succ for video " << video;
+                                    VLOG(1) << "send ack succ for video " << video;
                                 }
                             });
                         break;
                     }
                     default:
                     {
-                        LOG(ERROR) << "unknown response type: "
-                                   << response->inviteResponse_case();
+                        LOG(ERROR) << "unknown response type: " << response->inviteResponse_case();
                         break;
                     }
                     }
@@ -814,23 +725,18 @@ void RtpProducer::UnregisterVideo(const VideoRequest &video)
                 TearDownRequest request;
                 request.set_inviteid(it->second->inviteId);
                 mpGrpcClient->Call<TearDownRequest, TearDownResponse>(
-                    [this](ClientContext *context,
-                           const TearDownRequest &request,
+                    [this](ClientContext *context, const TearDownRequest &request,
                            CompletionQueue *cq) {
-                        return mpStub->PrepareAsyncTearDown(context, request,
-                                                            cq);
+                        return mpStub->PrepareAsyncTearDown(context, request, cq);
                     },
                     request, 0,
-                    [video(std::move(video))](
-                        std::unique_ptr<TearDownResponse> &&response,
-                        std::unique_ptr<::grpc::Status> &&error) {
+                    [video(std::move(video))](std::unique_ptr<TearDownResponse> &&response,
+                                              std::unique_ptr<::grpc::Status> &&error) {
                         if (error && !error->ok())
                         {
-                            LOG(ERROR)
-                                << "teardown failed for video " << video
-                                << ", error code: " << error->error_code()
-                                << ", error message: "
-                                << error->error_message();
+                            LOG(ERROR) << "teardown failed for video " << video
+                                       << ", error code: " << error->error_code()
+                                       << ", error message: " << error->error_message();
                         }
                         else
                         {

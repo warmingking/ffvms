@@ -84,6 +84,13 @@ RUN git clone -b ${JSON_TAG} https://github.com/nlohmann/json.git ${JSON_DIR} &&
     mkdir build && cd build && \
     cmake .. && make -j4 && make install
 
+ARG GPERFTOOLS_TAG=gperftools-2.9.1
+ARG GPERFTOOLS_DIR=/var/local/git/gperftools
+RUN git clone -b ${GPERFTOOLS_TAG} https://github.com/gperftools/gperftools.git ${GPERFTOOLS_DIR} && \
+    cd ${GPERFTOOLS_DIR} && \
+    ./configure --prefix=/usr/local --disable-cpu-profiler --disable-heap-profiler --disable-heap-checker --disable-debugalloc && \
+    make -j4 && make install
+
 RUN apt-get autoremove -y
 
 # dev image

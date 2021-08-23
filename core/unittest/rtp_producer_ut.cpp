@@ -14,7 +14,7 @@ using namespace ::testing;
 
 DEFINE_int32(push_local_port, 12300, "push rtp local port begin with");
 DEFINE_int32(video_greeter_port, 8899, "video greeter server port");
-DEFINE_int32(network_port, 8086, "udp receive port");
+DEFINE_int32(network_port, 18086, "udp receive port");
 DEFINE_int32(network_event_loop_num, 1, "network event loop number");
 DEFINE_int32(network_async_worker_num, 1, "network async worker number");
 DEFINE_int32(file_event_thread_num, 1, "file event thread number");
@@ -65,11 +65,10 @@ pid_t popen2(const char *command, char *const argv[], int *infp, int *outfp)
 class VideoGreeterServiceImpl final : public VideoGreeter::Service
 {
 public:
-    Status InviteVideo(ServerContext *context,
-                       const InviteVideoRequest *request,
+    Status InviteVideo(ServerContext *context, const InviteVideoRequest *request,
                        InviteVideoResponse *response) override
     {
-        std::string inviteId = fmt::format("{}", fmt::ptr(request));
+        std::string inviteId = fmt::format("{}", requestId.fetch_add(1));
         mPushSessions[inviteId] = RtpSession{portToUse.fetch_add(2), 0};
         response->set_inviteid(inviteId);
         auto *gbInviteRequest = response->mutable_gbinviteresponse();
@@ -90,9 +89,7 @@ public:
             std::string command = "/ffvms/push_rtp.sh";
             char *const argv[] = {
                 const_cast<char *>(command.c_str()),
-                const_cast<char *>(
-                    fmt::format("{}", it->second.pushPort).c_str()),
-                NULL};
+                const_cast<char *>(fmt::format("{}", it->second.pushPort).c_str()), NULL};
             it->second.pushPid = popen2(command.c_str(), argv, NULL, NULL);
             LOG(INFO) << "request " << request->inviteid() << " push pid "
                       << mPushSessions[request->inviteid()].pushPid;
@@ -118,7 +115,7 @@ public:
     }
 
     VideoGreeterServiceImpl(int local_port_begin_with)
-        : portToUse(local_port_begin_with)
+        : requestId(0), portToUse(local_port_begin_with)
     {
     }
 
@@ -129,6 +126,7 @@ private:
         pid_t pushPid;
     };
     std::atomic_int portToUse;
+    std::atomic_int requestId;
     std::map<std::string, RtpSession> mPushSessions;
 };
 
@@ -138,17 +136,14 @@ private:
     void SetUp() override
     {
         // mock server
-        mpService =
-            std::make_unique<VideoGreeterServiceImpl>(FLAGS_push_local_port);
+        mpService = std::make_unique<VideoGreeterServiceImpl>(FLAGS_push_local_port);
         ServerBuilder builder;
-        builder.AddListeningPort(
-            fmt::format("0.0.0.0:{}", FLAGS_video_greeter_port),
-            InsecureServerCredentials());
+        builder.AddListeningPort(fmt::format("0.0.0.0:{}", FLAGS_video_greeter_port),
+                                 InsecureServerCredentials());
         builder.RegisterService(mpService.get());
         mpServer = builder.BuildAndStart();
         ASSERT_TRUE(mpServer);
-        LOG(INFO) << "start greeter server on port "
-                  << FLAGS_video_greeter_port;
+        LOG(INFO) << "start greeter server on port " << FLAGS_video_greeter_port;
 
         NetworkServer::Config network_config;
         network_config.port = FLAGS_network_port;
@@ -159,10 +154,8 @@ private:
 
         RtpProducer::Config rtp_producer_config;
         rtp_producer_config.file_event_thread_num = FLAGS_file_event_thread_num;
-        rtp_producer_config.network_receive_host =
-            fmt::format("127.0.0.1:{}", FLAGS_network_port);
-        rtp_producer_config.sipper_host =
-            fmt::format("127.0.0.1:{}", FLAGS_video_greeter_port);
+        rtp_producer_config.network_receive_host = fmt::format("127.0.0.1:{}", FLAGS_network_port);
+        rtp_producer_config.sipper_host = fmt::format("127.0.0.1:{}", FLAGS_video_greeter_port);
         rtp_producer_config.rtp_jitter_in_ms = FLAGS_rtp_jitter_in_ms;
         rtp_producer_config.max_bandwidth_in_mb = FLAGS_max_bandwidth_in_mb;
         pProducer = std::make_unique<RtpProducer>();
