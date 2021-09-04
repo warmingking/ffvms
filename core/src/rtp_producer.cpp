@@ -10,6 +10,7 @@ using namespace common::grpc;
 using namespace ffvms::core;
 using namespace grpc;
 using namespace std::placeholders;
+using namespace common::metrics::prometheus;
 
 struct rtp_payload_t RtpProducer::RtpVideoContext::RtpPayloadFunc
 {
@@ -45,6 +46,7 @@ struct rtp_payload_t RtpProducer::RtpVideoContext::RtpPayloadFunc
             }
             */
             context->consumePktFunc((const char *)packet, bytes);
+            context->pProducedCounter->Increment(bytes);
             return rtp_onsend(context->rtp.get(), packet, bytes);
         }
 };
@@ -55,6 +57,24 @@ struct rtp_event_t RtpProducer::RtpVideoContext::RtpEventHandler
         // TODO: need implement
     }
 };
+
+RtpProducer::RtpVideoContext::RtpVideoContext(const VideoRequest &video,
+                                              ProcessSdpFunction &&processSdpFunc,
+                                              ConsumePktFuction &&consumePktFunc,
+                                              ProcessErrorFunction &&processErrorFunc)
+    : videoRequest(video), processSdpFunc(processSdpFunc), consumePktFunc(consumePktFunc),
+      processErrorFunc(processErrorFunc)
+//   demuxThread(std::make_unique<common::ThreadPool>(1))
+{
+    std::map<std::string, std::string> labels;
+    labels["module"] = "rtp producer";
+    labels["info"] = "produced bytes";
+    pProducedCounter = MMAddCounter(videoRequest.gbid, labels);
+    labels["info"] = "remux input bytes";
+    pRemuxCounter = MMAddCounter(videoRequest.gbid, labels);
+    labels["info"] = "demux input bytes";
+    pDemuxCounter = MMAddCounter(videoRequest.gbid, labels);
+}
 
 RtpProducer::~RtpProducer()
 {
@@ -429,6 +449,7 @@ int RtpProducer::RtpVideoContext::RtpOnPacket(void *param, const void *packet, i
 {
     VLOG_EVERY_N(1, 10) << "rtp on packet length " << bytes << ", send to payload encoder";
     RtpProducer::RtpVideoContext *context = static_cast<RtpProducer::RtpVideoContext *>(param);
+    context->pRemuxCounter->Increment(bytes);
 
     int ret(0);
     if (context->payloadBuf)
@@ -529,7 +550,7 @@ void RtpProducer::RegisterVideo(VideoRequest video, ProcessSdpFunction &&process
             request, mConfig.rpc_timeout_in_ms,
             [this, video(std::move(video)),
              pWeakContext(std::move(pWeakContext))](std::unique_ptr<InviteVideoResponse> &&response,
-                                                    std::unique_ptr<::grpc::Status> &&error) { 
+                                                    std::unique_ptr<::grpc::Status> &&error) {
                 std::shared_lock _(mRtpContextMutex);
                 auto pVideoContext = pWeakContext.lock();
                 if (!pVideoContext)
@@ -632,9 +653,12 @@ void RtpProducer::RegisterVideo(VideoRequest video, ProcessSdpFunction &&process
                         //             video.gbid));
                         // 注册这路流, 默认 UDP 模式, 收到数据 ( 一个 RTP 包 )
                         // 后直接丢给 rtp_demuxer
+                        LOG(INFO) << "register peer " << gbInviteResponse.peerinfo()
+                                  << " for video " << video;
                         mpNetworkServer->registerPeer(
                             gbInviteResponse.peerinfo(),
-                            [this, video, pWeakContext(std::move(pWeakContext))](const char *data, const size_t len) {
+                            [this, video, pWeakContext(std::move(pWeakContext))](const char *data,
+                                                                                 const size_t len) {
                                 std::shared_lock _(mRtpContextMutex);
                                 auto pVideoContext = pWeakContext.lock();
                                 if (!pVideoContext)
@@ -648,7 +672,8 @@ void RtpProducer::RegisterVideo(VideoRequest video, ProcessSdpFunction &&process
 
                                 // if (pVideoContext->videoRequest.gbid == "demo6")
                                 // {
-                                //     LOG_EVERY_N(INFO, 1000) << "dump " << pVideoContext->videoRequest
+                                //     LOG_EVERY_N(INFO, 1000) << "dump " <<
+                                //     pVideoContext->videoRequest
                                 //                             << " to file tbut_in.rtp";
                                 //     std::ofstream file("/ffvms/tbut_in.rtp",
                                 //                        std::ios::binary | std::ios::app);
@@ -661,6 +686,7 @@ void RtpProducer::RegisterVideo(VideoRequest video, ProcessSdpFunction &&process
                                 //     file.write(data, len);
                                 // }
 
+                                pVideoContext->pDemuxCounter->Increment(len);
                                 rtp_demuxer_input(pVideoContext->demuxer.get(), data, len);
                             });
 

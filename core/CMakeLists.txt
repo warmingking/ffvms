@@ -16,7 +16,6 @@ target_link_libraries(ffvms_core
     fmt
     gflags
     glog
-    uv
     event_core
     event_pthreads
     avformat
@@ -28,18 +27,17 @@ target_link_libraries(ffvms_core
     ${HTTP_LIB}
     grpc_common
     thread_pool_common
+    prometheus_common
     utils_common
     error_common
     ffvms_api
 )
 
-# target_compile_features(ffvms_core PUBLIC cxx_std_17)
-# set_target_properties(ffvms_core PROPERTIES CXX_EXTENSIONS OFF)
-
 add_executable(ffvms ffvms.cpp)
 target_link_libraries(ffvms ffvms_core)
 
 enable_testing()
+include(GoogleTest)
 
 add_executable(network_server_ut unittest/network_server_ut.cpp)
 target_link_libraries(network_server_ut ffvms_core gtest)
@@ -49,3 +47,5 @@ target_link_libraries(rtp_producer_ut ffvms_core gtest)
 
 add_executable(rtsp_service_ut unittest/rtsp_service_ut.cpp)
 target_link_libraries(rtsp_service_ut ffvms_core gtest)
+
+gtest_discover_tests(network_server_ut rtp_producer_ut rtsp_service_ut)

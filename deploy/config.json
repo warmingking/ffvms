@@ -1,4 +1,9 @@
 {
+    "metrics_manager": {
+        "exposer_port": 8844,
+        "family_prefix": "ffvms",
+        "endpoint_uri": ""
+    },
     "network_server": {
         "event_loop_num": -1,
         "async_worker_num": 0,

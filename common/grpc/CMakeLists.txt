@@ -14,6 +14,7 @@ target_link_libraries(grpc_common
 set(_gRPC_PROTO_GENS_DIR ${CMAKE_CURRENT_BINARY_DIR}/gen-cpp)
 
 enable_testing()
+include(GoogleTest)
 
 find_package(gRPC QUIET)
 find_package(Protobuf QUIET)
@@ -44,3 +45,5 @@ target_link_libraries(async_client_ut
     fmt
     grpc_common
 )
+
+gtest_discover_tests(async_client_ut)

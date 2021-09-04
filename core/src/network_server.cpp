@@ -8,6 +8,7 @@
 #include <glog/logging.h>
 
 using namespace ffvms::core;
+using namespace common::metrics::prometheus;
 
 static const size_t bufSize = 1024 * 1024;
 #define RTP_FLAG_MARKER 0x2
@@ -97,54 +98,20 @@ void NetworkServer::UdpEventLoop::Init(void *server, int port)
                     std::string peer =
                         fmt::format("{}:{}", inet_ntoa(addr->sin_addr), htons(addr->sin_port));
 
-                    // uint8_t *udata = (uint8_t *)data;
-                    // if (peer == "localhost:12300")
-                    // {
-                    //     LOG_EVERY_N(INFO, 1)
-                    //         << "seq: " << (udata[2] << 8 | udata[3])
-                    //         << ", len: " << len << ", data: "
-                    //         << fmt::format("{0:#x}",
-                    //                        uint32_t(udata[0] << 24 |
-                    //                                 udata[1] << 16 |
-                    //                                 udata[2] << 8 |
-                    //                                 udata[3]))
-                    //         << " "
-                    //         << fmt::format("{0:#x}",
-                    //                        uint32_t(udata[4] << 24 |
-                    //                                 udata[5] << 16 |
-                    //                                 udata[6] << 8 |
-                    //                                 udata[7]))
-                    //         << " "
-                    //         << fmt::format("{0:#x}",
-                    //                        uint32_t(udata[8] << 24 |
-                    //                                 udata[9] << 16 |
-                    //                                 udata[10] << 8 |
-                    //                                 udata[11]))
-                    //         << " "
-                    //         << fmt::format(
-                    //                "{0:#x}",
-                    //                uint32_t(udata[12] << 24 | udata[13] << 16
-                    //                |
-                    //                         udata[14] << 8 | udata[15]));
-                    //     // LOG_EVERY_N(INFO, 1000)
-                    //     //     << "dump peer " << peer << " to file
-                    //     tbut_in.rtp
-                    //     //     ";
-                    //     // std::ofstream
-                    //     file("/workspaces/ffvms/tbut_in.rtp",
-                    //     //                    std::ios::binary |
-                    //     std::ios::app);
-                    //     // // 先用 2 位保存 rtp 包的长度, 然后保存 rtp 包
-                    //     // char lenHeader[2] = {0, 0};
-                    //     // lenHeader[0] = len >> 8;
-                    //     // lenHeader[1] = len & 0xFF;
-                    //     // file.write(lenHeader, 2);
-                    //     // file.write((const char *)data, len);
-                    // }
+                    /* uncomment this to dump raw data as rtp
+                    LOG_EVERY_N(INFO, 1000) << "dump peer " << peer << " to file tbut_in.rtp";
+                    std::ofstream file("/workspaces/ffvms/tbut_in.rtp",
+                                       std::ios::binary | std::ios::app);
+                    // 先用 2 位保存 rtp 包的长度, 然后保存 rtp 包
+                    char lenHeader[2] = {0, 0};
+                    lenHeader[0] = len >> 8;
+                    lenHeader[1] = len & 0xFF;
+                    file.write(lenHeader, 2);
+                    file.write((const char *)data, len);
+                    */
 
                     // 这个线程池的 size 可以是 0, 表示同步进行 remux
                     // 理论上这样性能更优
-                    // TODO: 观察 recv-q
                     if (server->mpUdpWorkerThreads.empty())
                     {
                         std::shared_lock _(server->mMutex);
@@ -154,6 +121,7 @@ void NetworkServer::UdpEventLoop::Init(void *server, int port)
                             LOG(WARNING) << "peer " << peer << " not registered";
                             return;
                         }
+                        it->second->pCounter->Increment(len);
                         it->second->processFunc(data, len);
                     }
                     else
@@ -168,6 +136,7 @@ void NetworkServer::UdpEventLoop::Init(void *server, int port)
                                 LOG(WARNING) << "peer " << peer << " not registered";
                                 return;
                             }
+                            it->second->pCounter->Increment(len);
                             it->second->processFunc(data, len);
                         });
                     }
@@ -196,6 +165,15 @@ NetworkServer::UdpEventLoop::~UdpEventLoop()
 
     udpEventLoopThread.join();
     close(socket);
+}
+
+NetworkServer::Peer::Peer(const std::string &name, ProcessDataFunction &&processFunc)
+    : name(name), processFunc(processFunc)
+{
+    std::map<std::string, std::string> labels;
+    labels["module"] = "network server";
+    labels["info"] = "received bytes";
+    pCounter = MMAddCounter(name, labels);
 }
 
 NetworkServer::NetworkServer() : mReceiveBufferIndex(0), mCurPosition(0) {}

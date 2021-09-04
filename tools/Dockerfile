@@ -21,13 +21,6 @@ RUN apt-get update && \
 
 RUN git config --global url."https://github.com/".insteadOf git@github.com:
 
-ARG LIB_UV_TAG=v1.42.0
-ARG LIB_UV_DIR=/var/local/git/libuv
-RUN git clone -b ${LIB_UV_TAG} https://github.com/libuv/libuv.git ${LIB_UV_DIR} && \
-    cd ${LIB_UV_DIR} && \
-    sh autogen.sh && ./configure && \
-    make -j4 && make install
-
 ARG GRPC_TAG=v1.35.0
 ARG GRPC_DIR=/var/local/git/grpc
 RUN apt-get install -y libssl-dev zlib1g-dev && \
@@ -88,8 +81,17 @@ ARG GPERFTOOLS_TAG=gperftools-2.9.1
 ARG GPERFTOOLS_DIR=/var/local/git/gperftools
 RUN git clone -b ${GPERFTOOLS_TAG} https://github.com/gperftools/gperftools.git ${GPERFTOOLS_DIR} && \
     cd ${GPERFTOOLS_DIR} && \
-    ./configure --prefix=/usr/local --disable-cpu-profiler --disable-heap-profiler --disable-heap-checker --disable-debugalloc && \
+    ./autogen.sh && ./configure --prefix=/usr/local --disable-cpu-profiler --disable-heap-profiler --disable-heap-checker --disable-debugalloc && \
     make -j4 && make install
+
+ARG PROMETHEUS_TAG=v0.12.3
+ARG PROMETHEUS_DIR=/var/local/git/prometheus
+RUN git clone -b ${PROMETHEUS_TAG} https://github.com/jupp0r/prometheus-cpp.git ${PROMETHEUS_DIR} && \
+    cd ${PROMETHEUS_DIR} && \
+    git submodule update --init && \
+    mkdir build && cd build && \
+    # without push-gateway integration
+    cmake .. -DENABLE_PUSH=OFF && make -j4 && make install
 
 RUN apt-get autoremove -y
 

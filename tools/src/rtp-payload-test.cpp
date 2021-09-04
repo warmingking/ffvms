@@ -33,27 +33,24 @@ static void *rtp_alloc(void * /*param*/, int bytes)
         0,
         1,
     };
-    LOG_IF(FATAL, bytes > sizeof(buffer) - 4)
-        << "unexpected error, bytes too large";
+    LOG_IF(FATAL, bytes > sizeof(buffer) - 4) << "unexpected error, bytes too large";
     return buffer + 4;
 }
 
 static void rtp_free(void * /*param*/, void * /*packet*/) {}
 
-static int rtp_decode_packet(void *param, const void *packet, int bytes,
-                             uint32_t timestamp, int flags)
+static int rtp_decode_packet(void *param, const void *packet, int bytes, uint32_t timestamp,
+                             int flags)
 {
     static const uint8_t start_code[4] = {0, 0, 0, 1};
     struct rtp_payload_test_t *ctx = (struct rtp_payload_test_t *)param;
 
     static uint8_t buffer[2 * 1024 * 1024];
-    LOG_IF(FATAL, bytes + 4 >= sizeof(buffer))
-        << "unexpected error, bytes too large";
+    LOG_IF(FATAL, bytes + 4 >= sizeof(buffer)) << "unexpected error, bytes too large";
     // LOG_IF(FATAL, 0 != flags) << "unexpected error, unknown flags " << flags;
 
     size_t size = 0;
-    if (0 == strcmp("H264", ctx->encoding) ||
-        0 == strcmp("H265", ctx->encoding))
+    if (0 == strcmp("H264", ctx->encoding) || 0 == strcmp("H265", ctx->encoding))
     {
         memcpy(buffer, start_code, sizeof(start_code));
         size += sizeof(start_code);
@@ -64,14 +61,12 @@ static int rtp_decode_packet(void *param, const void *packet, int bytes,
         uint8_t profile = 2;
         uint8_t sampling_frequency_index = 4;
         uint8_t channel_configuration = 2;
-        buffer[0] = 0xFF; /* 12-syncword */
-        buffer[1] = 0xF0 /* 12-syncword */ | (0 << 3) /*1-ID*/ |
-                    (0x00 << 2) /*2-layer*/ | 0x01 /*1-protection_absent*/;
-        buffer[2] = ((profile - 1) << 6) |
-                    ((sampling_frequency_index & 0x0F) << 2) |
-                    ((channel_configuration >> 2) & 0x01);
-        buffer[3] =
-            ((channel_configuration & 0x03) << 6) | ((len >> 11) & 0x03);
+        buffer[0] = 0xFF;                                                    /* 12-syncword */
+        buffer[1] = 0xF0 /* 12-syncword */ | (0 << 3) /*1-ID*/ | (0x00 << 2) /*2-layer*/
+                    | 0x01 /*1-protection_absent*/;
+        buffer[2] = ((profile - 1) << 6) | ((sampling_frequency_index & 0x0F) << 2)
+                    | ((channel_configuration >> 2) & 0x01);
+        buffer[3] = ((channel_configuration & 0x03) << 6) | ((len >> 11) & 0x03);
         /*0-original_copy*/                /*0-home*/
         /*0-copyright_identification_bit*/ /*0-copyright_identification_start*/
         buffer[4] = (uint8_t)(len >> 3);
@@ -82,18 +77,16 @@ static int rtp_decode_packet(void *param, const void *packet, int bytes,
     memcpy(buffer + size, packet, bytes);
     size += bytes;
 
-    // TODO:
-    // check media file
+    // TODO: check media file
     fwrite(buffer, 1, size, ctx->fsource2);
 
     return 0;
 }
 
-void rtp_payload_test(int payload, const char *encoding, uint16_t seq,
-                      uint32_t ssrc, const char *rtpfile, const char *outfile)
+void rtp_payload_test(int payload, const char *encoding, uint16_t seq, uint32_t ssrc,
+                      const char *rtpfile, const char *outfile)
 {
-    LOG_IF(FATAL, access(rtpfile, F_OK) != 0)
-        << "rtpfile " << rtpfile << " not exist";
+    LOG_IF(FATAL, access(rtpfile, F_OK) != 0) << "rtpfile " << rtpfile << " not exist";
 
     struct rtp_payload_test_t ctx;
     ctx.payload = payload;
@@ -120,8 +113,7 @@ void rtp_payload_test(int payload, const char *encoding, uint16_t seq,
         }
 
         ctx.size = (s2[0] << 8) | s2[1];
-        LOG_IF(FATAL, ctx.size >= sizeof(ctx.packet))
-            << "unexpected error, ctx size too large";
+        LOG_IF(FATAL, ctx.size >= sizeof(ctx.packet)) << "unexpected error, ctx size too large";
         if (ctx.size != (int)fread(ctx.packet, 1, ctx.size, ctx.frtp))
             break;
 

@@ -337,7 +337,7 @@ int OnTeardown(void *ptr, rtsp_server_t *rtsp, const char *uri,
     return 0;
 }
 
-int OnAnnounce(void *ptr, rtsp_server_t *rtsp, const char *uri, const char *sdp)
+int OnAnnounce(void *ptr, rtsp_server_t *rtsp, const char *uri, const char *sdp, int len)
 {
     LOG(INFO) << "annonce\n" << uri;
     return 0;

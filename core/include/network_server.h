@@ -1,6 +1,7 @@
 #ifndef __NETWORK_SERVER_H__
 #define __NETWORK_SERVER_H__
 
+#include "metrics_manager.h"
 #include <event2/event.h>
 #include <functional>
 #include <map>
@@ -42,11 +43,9 @@ private:
     {
         std::string name;
         ProcessDataFunction processFunc;
+        common::metrics::prometheus::MetricsManager::UPCounter pCounter;
 
-        Peer(const std::string &name, ProcessDataFunction &&processFunc)
-            : name(name), processFunc(processFunc)
-        {
-        }
+        Peer(const std::string &name, ProcessDataFunction &&processFunc);
     };
 
     struct UdpEventLoop

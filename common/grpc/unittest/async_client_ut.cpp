@@ -89,7 +89,6 @@ int main(int argc, char **argv)
 {
     FLAGS_logtostderr = 1;
     InitGoogleLogging(argv[0]);
-    ParseCommandLineFlags(&argc, &argv, true);
     InitGoogleTest(&argc, argv);
 
     return RUN_ALL_TESTS();

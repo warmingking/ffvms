@@ -1,4 +1,5 @@
 add_subdirectory(error_code)
+add_subdirectory(metrics)
 add_subdirectory(grpc)
 add_subdirectory(thread_pool)
 add_subdirectory(utils)

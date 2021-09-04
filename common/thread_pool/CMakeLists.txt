@@ -9,8 +9,8 @@ target_link_libraries(thread_pool_common
 )
 
 enable_testing()
+include(GoogleTest)
 
-# TODO: gtest_add_tests
 add_executable(thread_pool_ut unittest/thread_pool_ut.cpp)
 target_link_libraries(thread_pool_ut
     gtest
@@ -18,3 +18,5 @@ target_link_libraries(thread_pool_ut
     gflags
     thread_pool_common
 )
+
+gtest_discover_tests(thread_pool_ut)
