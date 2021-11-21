@@ -69,6 +69,7 @@ function(protobuf_generate_grpc_cpp SRCS HDRS GENERATED_DIR)
   include_directories(${GENERATED_DIR})
 endfunction()
 
+add_subdirectory(third_party)
 add_subdirectory(common)
 add_subdirectory(api)
 add_subdirectory(core)

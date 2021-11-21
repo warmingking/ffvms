@@ -11,7 +11,6 @@ RUN apt-get update && \
     autoconf \
     automake \
     build-essential \
-    g++ \
     cmake \
     libboost-all-dev \
     libavformat-dev \
@@ -46,22 +45,6 @@ ARG HTTP_PARSER_DIR=/var/local/git/http-parser
 RUN git clone -b ${HTTP_PARSER_TAG} https://github.com/ploxiln/http-parser ${HTTP_PARSER_DIR} && \
     cd ${HTTP_PARSER_DIR} && \
     make && make install
-
-ARG MEDIA_SERVER_TAG=master
-ARG MEDIA_SERVER_DIR=/var/local/git/media-server
-ARG MEDIA_SERVER_INSTALL_DIR=/usr/local/include/media_server
-RUN apt-get install -y bc && \
-    git clone -b ${MEDIA_SERVER_TAG} https://github.com/ireader/sdk ${MEDIA_SERVER_DIR}/sdk && \
-    git clone -b ${MEDIA_SERVER_TAG} https://github.com/ireader/avcodec ${MEDIA_SERVER_DIR}/avcodec && \
-    git clone -b ${MEDIA_SERVER_TAG} https://github.com/ireader/media-server ${MEDIA_SERVER_DIR}/media-server && \
-    mkdir ${MEDIA_SERVER_INSTALL_DIR} && \
-    cd ${MEDIA_SERVER_DIR}/avcodec && make clean && make -j4 RELEASE=1 && \
-    for LIB in $(ls -d */ | awk -F '/' '{print $1}'); do cp -r $LIB/include ${MEDIA_SERVER_INSTALL_DIR}/$LIB ; cp $LIB/release.linux/$LIB.a /usr/local/lib | true ; done && \
-    cd ${MEDIA_SERVER_DIR}/media-server && \
-    make clean && make -j4 RELEASE=1 && \
-    for LIB in $(ls -d lib*); do cp -r $LIB/include ${MEDIA_SERVER_INSTALL_DIR}/$LIB ; cp $LIB/release.linux/$LIB.a /usr/local/lib ; done && \
-    cd ../sdk && make clean && make -j4 RELEASE=1 && cp -r include/* ${MEDIA_SERVER_INSTALL_DIR} && \
-    for LIB in $(ls -d lib*); do cp -r $LIB/include ${MEDIA_SERVER_INSTALL_DIR}/$LIB ; cp $LIB/release.linux/$LIB.a /usr/local/lib ; done
 
 ARG FMT_TAG=master
 ARG FMT_DIR=/var/local/git/fmt
@@ -103,7 +86,7 @@ ENV TZ=$TIMEZONE
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 RUN apt-get update && \
-    apt-get install -y openssh-server sudo gdb lsof net-tools netcat zsh zsh-antigen ffmpeg linux-tools-5.4.0-70-generic wget unzip && \
+    apt-get install -y openssh-server sudo gdb lsof net-tools netcat zsh zsh-antigen ffmpeg linux-tools-5.4.0-70-generic wget unzip tmux && \
     apt-get autoremove -y
 
 RUN wget -q https://github.com/brendangregg/FlameGraph/archive/master.zip && \
