@@ -1,9 +1,9 @@
-[submodule "third_party/media-sdk"]
-	path = third_party/media-sdk
-	url = https://github.com/ireader/sdk
-[submodule "third_party/media-avcodec"]
-	path = third_party/media-avcodec
-	url = https://github.com/ireader/avcodec
-[submodule "third_party/media-server"]
-	path = third_party/media-server
+[submodule "third_party/media-server/media-server"]
+	path = third_party/media-server/media-server
 	url = https://github.com/ireader/media-server
+[submodule "third_party/media-server/sdk"]
+	path = third_party/media-server/sdk
+	url = https://github.com/ireader/sdk
+[submodule "third_party/media-server/avcodec"]
+	path = third_party/media-server/avcodec
+	url = https://github.com/ireader/avcodec
