@@ -5,9 +5,9 @@
 #include <event2/thread.h>
 #include <fcntl.h>
 #include <fmt/core.h>
-#include <media_server/path.h>
-#include <media_server/uri-parse.h>
-#include <media_server/urlcodec.h>
+#include <path.h>
+#include <uri-parse.h>
+#include <urlcodec.h>
 #include <netinet/tcp.h>
 #include <stdlib.h>
 #include <sys/socket.h>

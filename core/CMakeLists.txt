@@ -1,7 +1,7 @@
 find_library(HTTP_PARSER_LIB http_parser) # for libraries not managed by cmake, we prefer static library
-find_library(RTP_LIB librtp.a)
-find_library(RTSP_LIB librtsp.a)
-find_library(HTTP_LIB libhttp.a)
+# find_library(RTP_LIB librtp.a)
+# find_library(RTSP_LIB librtsp.a)
+# find_library(HTTP_LIB libhttp.a)
 
 aux_source_directory(src sources)
 
@@ -22,9 +22,10 @@ target_link_libraries(ffvms_core
     avcodec
     avutil
     ${HTTP_PARSER_LIB}
-    ${RTP_LIB}
-    ${RTSP_LIB}
-    ${HTTP_LIB}
+    # ${RTP_LIB}
+    # ${RTSP_LIB}
+    # ${HTTP_LIB}
+    media_server
     grpc_common
     thread_pool_common
     prometheus_common
@@ -47,5 +48,6 @@ target_link_libraries(rtp_producer_ut ffvms_core gtest)
 
 add_executable(rtsp_service_ut unittest/rtsp_service_ut.cpp)
 target_link_libraries(rtsp_service_ut ffvms_core gtest)
+message("=====", $<TARGET_FILE:ffvms_core>)
 
 gtest_discover_tests(network_server_ut rtp_producer_ut rtsp_service_ut)

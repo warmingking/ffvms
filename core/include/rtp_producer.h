@@ -8,9 +8,9 @@
 #include <event2/event.h>
 #include <functional>
 #include <map>
-#include <media_server/librtp/rtp-demuxer.h>
-#include <media_server/librtp/rtp-payload.h>
-#include <media_server/librtp/rtp.h>
+#include <rtp-demuxer.h>
+#include <rtp-payload.h>
+#include <rtp.h>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>

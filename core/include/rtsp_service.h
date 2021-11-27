@@ -6,7 +6,7 @@
 #include <event2/bufferevent.h>
 #include <functional>
 #include <map>
-#include <media_server/librtsp/rtsp-server.h>
+#include <rtsp-server.h>
 #include <memory>
 #include <set>
 #include <shared_mutex>

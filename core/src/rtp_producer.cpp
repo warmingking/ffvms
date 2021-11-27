@@ -4,7 +4,7 @@
 #include <event2/thread.h>
 #include <fmt/core.h>
 #include <fstream>
-#include <media_server/librtp/rtp-profile.h>
+#include <rtp-profile.h>
 
 using namespace common::grpc;
 using namespace ffvms::core;
